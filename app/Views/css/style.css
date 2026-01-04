@@ -1,0 +1,400 @@
+:root {
+    /* Dark Mode (Mặc định) */
+    --bg-primary: var(--md-sys-color-background);
+    --bg-secondary: var(--md-sys-color-surface);
+    --text-primary: var(--md-sys-color-on-background);
+    --text-secondary: var(--md-sys-color-on-surface-variant);
+    --border-color: var(--md-sys-color-outline);
+    --accent-color: var(--md-sys-color-primary);
+    --highlight-color: var(--md-sys-color-secondary);
+    --danger-color: var(--md-sys-color-error);
+    --danger-hover: #9e1c18; /* Màu hover cho lỗi (tự chọn dựa trên màu lỗi) */
+    --card-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    --color-scheme: dark;
+}
+
+html.light {
+    /* Light Mode */
+    --bg-primary: var(--md-sys-color-on-primary);
+    --bg-secondary: var(--md-sys-color-primary-container);
+    --text-primary: var(--md-sys-color-primary);
+    --text-secondary: var(--md-sys-color-on-primary-container);
+    --border-color: var(--md-sys-color-outline);
+    --accent-color: var(--md-sys-color-primary);
+    --highlight-color: var(--md-sys-color-secondary);
+    --danger-color: var(--md-sys-color-error);
+    --danger-hover: #9e1c18; /* Màu hover cho lỗi (tự chọn dựa trên màu lỗi) */
+    --card-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+    --color-scheme: light;
+}
+
+body {
+    font-family: "Inter", sans-serif;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* ... (Các class CSS tiện ích không đổi) ... */
+.bg-primary {
+    background-color: var(--bg-primary);
+}
+
+.bg-secondary {
+    background-color: var(--bg-secondary);
+}
+
+.text-primary {
+    color: var(--text-primary);
+}
+
+.text-secondary {
+    color: var(--text-secondary);
+}
+
+.border-color {
+    border-color: var(--border-color);
+}
+
+.accent {
+    background-color: var(--accent-color);
+}
+
+.accent-text {
+    color: var(--accent-color);
+}
+
+.highlight-text {
+    color: var(--highlight-color);
+}
+
+.tab-btn {
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.tab-active {
+    background-color: var(--accent-color);
+    color: var(--md-sys-color-on-primary);
+}
+
+.tab-inactive {
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content-active {
+    display: block;
+}
+
+.muscle-circle {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    border-radius: 20px;
+    transition: all 0.2s ease;
+    background-color: var(--bg-secondary);
+    border: 2px solid var(--accent-color);
+    width: 100%;
+    max-width: 140px;
+    height: 140px;
+    cursor: pointer;
+    text-align: center;
+    padding: 8px;
+    box-shadow: var(--card-shadow);
+}
+
+.muscle-circle:hover {
+    border-color: var(--accent-color);
+    transform: translateY(-4px);
+}
+
+.muscle-circle.trained {
+    /* background-color: var(--md-sys-color-surface-variant); */
+    border-color: var(--md-sys-color-surface-variant);
+    border-width: 6px;
+}
+
+html.light .muscle-circle.trained {
+    background-color: var(--md-sys-color-on-surface-variant);
+}
+
+.muscle-icon {
+    font-size: 28px;
+    margin-bottom: 4px;
+    color: var(--accent-color);
+}
+
+.muscle-name-label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.muscle-count {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--highlight-color);
+    margin-top: 4px;
+}
+
+.muscle-prev-weight {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--md-sys-color-surface-variant);
+    margin-top: 2px;
+}
+
+/* (Mobile-first) Đảm bảo grid-cols-2 là mặc định */
+.muscle-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+    place-items: center;
+}
+
+/* 3 cột trên tablet trở lên */
+@media (min-width: 640px) {
+    .muscle-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+.data-table-checkbox {
+    width: 1.25rem;
+    height: 1.25rem;
+    border-radius: 0.25rem;
+    background-color: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    cursor: pointer;
+    appearance: none;
+    display: inline-block;
+    vertical-align: middle;
+    position: relative;
+}
+
+.data-table-checkbox:checked {
+    background-color: var(--accent-color);
+    border-color: var(--accent-color);
+}
+
+.data-table-checkbox:checked::after {
+    content: "✓";
+    font-size: 0.9rem;
+    color: var(--md-sys-color-on-primary);
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.form-input {
+    border: 1px solid var(--border-color);
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    width: 100%;
+    transition: all 0.2s;
+    color-scheme: var(--color-scheme);
+}
+
+.form-input:focus {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 2px var(--accent-color);
+    outline: none;
+}
+
+.form-label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+    display: block;
+}
+
+#theme-toggle-btn {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 100;
+    width: 3rem;
+    height: 3rem;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    cursor: pointer;
+    box-shadow: var(--card-shadow);
+}
+
+#theme-toggle-btn .material-icons-outlined {
+    transition: transform 0.3s ease;
+}
+
+#light-icon {
+    display: none;
+}
+
+.modal {
+    position: fixed;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 50;
+    padding: 1rem;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.modal.open {
+    opacity: 1;
+    visibility: visible;
+}
+
+.modal-content {
+    padding: 1.5rem;
+    border-radius: 1rem;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    width: 100%;
+    max-width: 400px;
+    background-color: var(--bg-secondary);
+    transform: scale(0.95);
+    transition: transform 0.3s ease;
+}
+
+.modal.open .modal-content {
+    transform: scale(1);
+}
+
+/* ... (Các class nút .btn-... không đổi) ... */
+.btn-danger {
+    background-color: var(--danger-color);
+    color: white;
+    font-weight: 600;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    transition: background-color 0.2s;
+}
+
+.btn-danger:hover {
+    background-color: var(--danger-hover);
+}
+
+.btn-primary {
+    background-color: var(--accent-color);
+    color: white;
+    font-weight: 600;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    transition: background-color 0.2s;
+}
+
+.btn-primary-full {
+    background-color: var(--accent-color);
+    color: white;
+    font-weight: 600;
+    padding: 0.65rem 1.5rem;
+    border-radius: 0.5rem;
+    transition: background-color 0.2s;
+    width: 100%;
+}
+
+.btn-secondary {
+    background-color: #3f3f46;
+    color: var(--text-primary);
+    font-weight: 600;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    transition: background-color 0.2s;
+}
+
+html.light .btn-secondary {
+    background-color: #e4e4e7;
+}
+
+.card {
+    padding: 1rem 1.5rem;
+    border-radius: 1rem;
+    box-shadow: var(--card-shadow);
+    background-color: var(--bg-secondary);
+}
+
+/* (CẬP NHẬT) Sửa lại CSS cho pop-up */
+#day-detail-popup {
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--card-shadow);
+    transition: opacity 0.2s ease, top 0.2s ease, left 0.2s ease,
+        visibility 0.2s ease;
+    visibility: hidden;
+    /* Ẩn mặc định */
+    opacity: 0;
+    position: absolute;
+    /* Đã nằm trong .relative container */
+    z-index: 50;
+    padding: 0.75rem;
+    border-radius: 0.5rem;
+    min-width: 150px;
+}
+
+#day-detail-popup.visible {
+    visibility: visible;
+    opacity: 1;
+}
+
+.popup-muscle-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+}
+
+.popup-muscle-item .material-icons-outlined {
+    font-size: 20px;
+    color: var(--accent-color);
+}
+
+#workout-weight-options {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    white-space: nowrap;
+    overflow-x: auto; /* Giữ khả năng cuộn */
+    scrollbar-width: none; /* Ẩn thanh trượt trên Firefox */
+}
+
+.weight-option {
+    flex-shrink: 0;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+
+.weight-option.selected, .rep-option.selected {
+    background-color: var(--highlight-color); /* Màu khi được chọn */
+    color: white;
+}
+
+
+#workout-weight-options::-webkit-scrollbar {
+    display: none; /* Ẩn thanh trượt trên Chrome, Edge */
+}

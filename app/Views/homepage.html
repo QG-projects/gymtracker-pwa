@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <!-- Metadata -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trình theo dõi tập luyện Gym</title>
+
+    <!-- PWA Configuration -->
+    <link rel="manifest" href="../../manifest.json">
+    <link rel="icon" type="image/x-icon" href="../../favicon.ico">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Symbols+Outlined" rel="stylesheet">
+    <!-- Firebase App (core) -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <!-- Firebase Database -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="./css/colors.css">
+    <link rel="stylesheet" href="./css/style.css">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+</head>
+
+<body>
+    <button id="theme-toggle-btn" title="Chuyển theme">
+        <span id="dark-icon" class="material-symbols-outlined">dark_mode</span>
+        <span id="light-icon" class="material-symbols-outlined">light_mode</span>
+    </button>
+
+    <div class="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl sm:text-4xl font-bold text-primary">Gym Workout Tracker</h1>
+            <p class="text-secondary mt-2">Nhấn vào nhóm cơ để ghi lại buổi tập của bạn</p>
+        </header>
+
+        <div class="flex justify-center space-x-2 sm:space-x-4 mb-6 sm:mb-8 p-2 rounded-lg bg-secondary">
+            <button id="tab-tracker-btn" class="tab-btn tab-active px-4 py-2 rounded-md font-semibold transition w-1/2">
+                <span class="material-symbols-outlined">dashboard</span> Dashboard
+            </button>
+            <button id="tab-personal-btn"
+                class="tab-btn tab-inactive px-4 py-2 rounded-md font-semibold transition w-1/2">
+                <span class="material-symbols-outlined">person</span> Cá nhân
+            </button>
+        </div>
+
+        <!-- Tab 1: Dashboard -->
+        <div id="tab-tracker-content" class="tab-content tab-content-active">
+            <div class="flex flex-col lg:flex-row gap-8">
+                <div class="w-full lg:w-2/3 p-4 rounded-xl card">
+                    <div id="front-body-container" class="mb-8"></div>
+                    <div id="back-body-container"></div>
+                </div>
+                <div class="w-full lg:w-1/3 p-6 rounded-xl card flex flex-col justify-center">
+                    <h2 class="text-xl font-bold text-primary text-center mb-6">Hoạt động trong tuần</h2>
+                    <!-- (CẬP NHẬT) Cấu trúc HTML của weekly-view -->
+                    <div id="weekly-view" class="relative">
+                        <!-- (MỚI) Container riêng cho các ngày -->
+                        <div id="weekly-days-container" class="flex justify-around items-center w-full">
+                            <!-- JS injects days here -->
+                        </div>
+
+                        <!-- (MỚI) Pop-up đã được di chuyển vào đây -->
+                        <div id="day-detail-popup">
+                            <h4 id="popup-date-title" class="text-sm font-bold text-center mb-2 text-primary"></h4>
+                            <div id="popup-muscle-list" class="flex flex-col gap-2"></div>
+                            <div id="popup-no-workout" class="text-secondary text-sm text-center hidden">
+                                Không có buổi tập.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 2: Cá nhân (Không đổi) -->
+        <div id="tab-personal-content" class="tab-content space-y-8">
+            <!-- ... (Nội dung tab cá nhân không đổi) ... -->
+            <div class="card">
+                <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-4">
+                    <h2 class="text-xl font-bold text-primary">Thống kê số đo</h2>
+                    <div class="flex gap-2">
+                        <button id="add-measurement-btn" class="btn-primary flex items-center gap-2">
+                            <span class="material-symbols-outlined">add</span> Thêm số đo
+                        </button>
+                        <button id="delete-selected-measurements-btn" class="hidden btn-danger flex items-center gap-2">
+                            <span class="material-symbols-outlined">delete</span> Xóa
+                        </button>
+                    </div>
+                </div>
+                <div class="overflow-x-auto max-h-[40vh] relative">
+                    <table class="w-full text-left">
+                        <thead class="sticky top-0 bg-secondary">
+                            <tr>
+                                <th class="p-3 w-12"><input type="checkbox" id="select-all-measurements-checkbox"class="data-table-checkbox"></th>
+                                <th class="p-3 text-primary">Ngày</th>
+                                <th class="p-3 text-primary">Cân nặng</th>
+                                <th class="p-3 text-primary">Ngực</th>
+                                <th class="p-3 text-primary">Eo</th>
+                                <th class="p-3 text-primary">Mông</th>
+                                <th class="p-3 text-primary">Tay</th>
+                            </tr>
+                        </thead>
+                        <tbody id="measurements-table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card">
+                <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-4">
+                    <h2 class="text-xl font-bold text-primary">Lịch sử tập luyện</h2>
+                    <button id="delete-selected-workouts-btn" class="hidden btn-danger flex items-center gap-2">
+                        <span class="material-symbols-outlined">delete</span> Xóa mục đã chọn
+                    </button>
+                </div>
+                <div class="flex flex-col sm:flex-row gap-4 mb-4">
+                    <input type="text" id="search-input" placeholder="Tìm kiếm nhóm cơ..."
+                        class="form-input w-full sm:w-1/2">
+                    <select id="filter-select" class="form-input w-full sm:w-1/2">
+                        <option value="all">Tất cả nhóm cơ</option>
+                    </select>
+                </div>
+                <div class="overflow-x-auto max-h-[60vh] relative">
+                    <table class="w-full text-left">
+                        <thead class="sticky top-0 bg-secondary">
+                            <tr>
+                                <th class="p-3 w-12"><input type="checkbox" id="select-all-workouts-checkbox"
+                                        class="data-table-checkbox"></th>
+                                <th class="p-3 text-primary">Nhóm cơ</th>
+                                <th class="p-3 text-primary">Ngày tập</th>
+                                <th class="p-3 text-primary">Số kg</th>
+                                <th class="p-3 text-primary">Số rep</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card">
+                <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-4">
+                    <h2 class="text-xl font-bold text-primary">Cấu hình tập luyện</h2>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <!-- Cấu hình số kg -->
+                    <div>
+                        <h3 class="text-lg font-semibold text-secondary mb-2">Cấu hình số kg</h3>
+                        <div id="weight-config-container" class="flex flex-wrap gap-2">
+                            <!-- Các giá trị số kg sẽ được render tại đây -->
+                        </div>
+                        <div class="flex gap-2 mt-4">
+                            <input type="number" id="new-weight-input" placeholder="Thêm số kg"
+                                class="form-input w-full">
+                            <button id="add-weight-btn" class="btn-primary">Thêm</button>
+                        </div>
+                    </div>
+
+                    <!-- Cấu hình số rep -->
+                    <div>
+                        <h3 class="text-lg font-semibold text-secondary mb-2">Cấu hình số rep</h3>
+                        <div id="rep-config-container" class="flex flex-wrap gap-2">
+                            <!-- Các giá trị số rep sẽ được render tại đây -->
+                        </div>
+                        <div class="flex gap-2 mt-4">
+                            <input type="number" id="new-rep-input" placeholder="Thêm số rep" class="form-input w-full">
+                            <button id="add-rep-btn" class="btn-primary">Thêm</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Ghi nhận buổi tập (Không đổi) -->
+    <div id="log-modal" class="modal">
+        <div class="modal-content">
+            <h2 id="modal-muscle-name" class="text-2xl font-bold mb-4 text-center accent-text"></h2>
+            <div class="mb-4 text-center">
+                <span class="text-sm font-medium text-secondary">Lần tập trước:</span>
+                <span id="previous-weight-display" class="text-lg font-bold ml-2 text-primary">-- kg</span>
+            </div>
+            <div class="mb-4">
+                <label for="workout-date" class="form-label">Chọn ngày:</label>
+                <input type="date" id="workout-date" class="form-input">
+            </div>
+            <div class="mb-6">
+                <label for="workout-weight-options" class="form-label">Số kg tập hôm nay:</label>
+                <div id="workout-weight-options" class="flex gap-2 overflow-x-auto p-2 rounded-lg bg-secondary">
+                    <!-- Các giá trị kg thông dụng -->
+                </div>
+                <!-- Input ẩn để lưu giá trị -->
+                <input type="hidden" id="workout-weight-input">
+            </div>
+            <div class="mb-6">
+                <label for="workout-rep-options" class="form-label">Số rep hôm nay:</label>
+                <div id="workout-rep-options" class="flex gap-2 overflow-x-auto p-2 rounded-lg bg-secondary">
+                    <!-- Các giá trị rep thông dụng -->
+                    <!-- Thêm các giá trị khác nếu cần -->
+                </div>
+                <input type="hidden" id="workout-rep-input">
+            </div>
+            <div class="flex justify-end gap-4">
+                <button id="cancel-btn" class="btn-secondary">Hủy</button>
+                <button id="confirm-btn" class="btn-primary">Lưu</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Ghi nhận số đo (Không đổi) -->
+    <div id="measurement-modal" class="modal">
+        <div class="modal-content">
+            <h2 class="text-2xl font-bold mb-6 text-center text-primary">Ghi nhận số đo</h2>
+            <form id="measurement-form" class="space-y-4">
+                <div>
+                    <label for="measurement-date-input" class="form-label">Ngày</label>
+                    <input type="date" id="measurement-date-input" class="form-input">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label for="measurement-weight-input" class="form-label">Cân nặng (kg)</label>
+                        <input type="number" inputmode="decimal" id="measurement-weight-input" placeholder="0"
+                            class="form-input">
+                    </div>
+                    <div>
+                        <label for="measurement-chest-input" class="form-label">Ngực (cm)</label>
+                        <input type="number" inputmode="decimal" id="measurement-chest-input" placeholder="0"
+                            class="form-input">
+                    </div>
+                    <div>
+                        <label for="measurement-waist-input" class="form-label">Eo (cm)</label>
+                        <input type="number" inputmode="decimal" id="measurement-waist-input" placeholder="0"
+                            class="form-input">
+                    </div>
+                    <div>
+                        <label for="measurement-hips-input" class="form-label">Mông (cm)</label>
+                        <input type="number" inputmode="decimal" id="measurement-hips-input" placeholder="0"
+                            class="form-input">
+                    </div>
+                    <div>
+                        <label for="measurement-arm-input" class="form-label">Tay (cm)</label>
+                        <input type="number" inputmode="decimal" id="measurement-arm-input" placeholder="0"
+                            class="form-input">
+                    </div>
+                </div>
+                <div class="flex justify-end gap-4 pt-4">
+                    <button type="button" id="cancel-measurement-btn" class="btn-secondary">Hủy</button>
+                    <button type="submit" id="save-measurement-btn" class="btn-primary">Lưu số đo</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="../../js/js-main.js" defer></script>
+    <script src="../../js/read-write-data.js" defer></script>
+    <script src="../../js/app.js"></script>
+    <script src="../../js/firebase-config.js"></script>
+    <script src="../../js/firebase-connect.js"></script>
+</body>
+
+</html>

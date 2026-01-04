@@ -1,0 +1,55 @@
+/* Alias màu hệ thống */
+/* --- Material 3 Design System Variables (Light Mode) --- md: material design */
+:root {
+  /* Màu chính */
+  --md-sys-color-primary: #313647; /* Màu chính cho background */
+  --md-sys-color-on-primary: #FFF8D4; /* Màu chữ nổi bật trên nền chính */
+  --md-sys-color-primary-container: #435663; /* Màu nhấn cho container */
+  --md-sys-color-on-primary-container: #FFF8D4; /* Màu chữ trên container chính */
+
+  /* Màu phụ */
+  --md-sys-color-secondary: #A3B087; /* Màu phụ */
+  --md-sys-color-on-secondary: #313647; /* Màu chữ trên nền phụ */
+  --md-sys-color-secondary-container: #435663; /* Màu nhấn cho container phụ */
+  --md-sys-color-on-secondary-container: #FFF8D4; /* Màu chữ trên container phụ */
+
+  /* Màu bổ sung */
+  --md-sys-color-tertiary: #435663; /* Màu bổ sung */
+  --md-sys-color-on-tertiary: #FFF8D4; /* Màu chữ trên nền bổ sung */
+  --md-sys-color-tertiary-container: #A3B087; /* Màu nhấn cho container bổ sung */
+  --md-sys-color-on-tertiary-container: #313647; /* Màu chữ trên container bổ sung */
+
+  /* Màu lỗi */
+  --md-sys-color-error: #253208; /* Màu lỗi */
+  --md-sys-color-on-error: #313647; /* Màu chữ trên lỗi */
+
+  /* Màu nền */
+  --md-sys-color-background: #313647; /* Màu nền chính */
+  --md-sys-color-on-background: #FFF8D4; /* Màu chữ trên nền chính */
+
+  /* Màu bề mặt */
+  --md-sys-color-surface: #435663; /* Màu bề mặt */
+  --md-sys-color-on-surface: #FFF8D4; /* Màu chữ trên bề mặt */
+  --md-sys-color-surface-variant: #A3B087; /* Màu bề mặt biến thể */
+  --md-sys-color-on-surface-variant: #313647; /* Màu chữ trên bề mặt biến thể */
+
+  /* Màu viền */
+  --md-sys-color-outline: #A3B087; /* Màu viền */
+
+  /* Màu thành công và cảnh báo */
+  --md-sys-color-success: #6fef76; /* Màu thành công (giữ nguyên để dễ nhận biết) */
+  --md-sys-color-warning: #FFA000; /* Màu cảnh báo (giữ nguyên để dễ nhận biết) */
+
+  /* Màu nghịch đảo */
+  --md-sys-color-inverse-surface: #FFF8D4; /* Nền nghịch đảo */
+  --md-sys-color-inverse-on-surface: #313647; /* Chữ trên nền nghịch đảo */
+  --md-sys-color-inverse-primary: #A3B087; /* Màu chính nghịch đảo */
+
+  /* Custom property to get RGB values for primary color for background highlight */
+  --md-sys-color-primary-rgb: 49, 54, 71; /* #313647 converted to RGB */
+
+  /* Primary font variable */
+  --md-sys-font-primary: "Noto Sans Mono", monospace;
+  /* Fallback generic stack in case the webfont doesn't load */
+  --md-sys-font-fallback: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", "Courier New", monospace;
+}
