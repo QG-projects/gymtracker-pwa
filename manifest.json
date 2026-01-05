@@ -9,7 +9,7 @@
     "theme_color": "#313647",
     "description": "A simple gym tracker app with offline support.",
     "lang": "vi-VN",
-    "ver": "1.0.3",
+    "ver": "1.0.4",
     "icons": [
         {
             "src": "./images/icon-94x94.png",
