@@ -222,7 +222,7 @@ html.light .muscle-circle.trained {
     display: block;
 }
 
-#theme-toggle-btn {
+#progress-info-btn {
     position: fixed;
     top: 1rem;
     right: 1rem;
@@ -235,7 +235,7 @@ html.light .muscle-circle.trained {
     align-items: center;
     background-color: var(--bg-secondary);
     color: var(--text-primary);
-    border: 1px solid var(--border-color);
+    /* border: 1px solid var(--border-color); */
     cursor: pointer;
     box-shadow: var(--card-shadow);
 }

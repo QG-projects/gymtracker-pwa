@@ -127,7 +127,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const openModal = (modal) => modal.classList.add('open');
     const closeModal = (modal) => modal.classList.remove('open');
 
-    
+
     // tiện ích: trả về khoảng tuần (T2..CN) dựa trên ngày tham chiếu
     const getWeekRange = (referenceDate = new Date()) => {
         const today = new Date(referenceDate);
@@ -151,22 +151,53 @@ document.addEventListener('DOMContentLoaded', () => {
         return { startOfWeek, endOfWeek, dayNames, dateStrings };
     };
 
+
+    const normalizeToIsoDate = (d) => {
+        if (!d) return null;
+        if (d.toDate) d = d.toDate();
+        if (typeof d === 'string') d = new Date(d);
+        if (d instanceof Date && !isNaN(d)) return d.toISOString().split('T')[0];
+        return null;
+    };
     // =================================================================
     // 4. QUẢN LÝ GIAO DIỆN (THEME MANAGEMENT)
     // =================================================================
 
-    const applyTheme = (theme) => {
-        document.documentElement.classList.toggle('light', theme === 'light');
-    };
+    // const applyTheme = (theme) => {
+    //     document.documentElement.classList.toggle('light', theme === 'light');
+    // };
 
-    const toggleTheme = () => {
-        const currentTheme = document.documentElement.classList.contains('light') ? 'light' : 'dark';
-        const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-        applyTheme(newTheme);
-        localStorage.setItem('theme', newTheme);
-    };
+    // const toggleTheme = () => {
+    //     const currentTheme = document.documentElement.classList.contains('light') ? 'light' : 'dark';
+    //     const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+    //     applyTheme(newTheme);
+    //     localStorage.setItem('theme', newTheme);
+    // };
 
-    themeToggleBtn.addEventListener('click', toggleTheme);
+    // themeToggleBtn.addEventListener('click', toggleTheme);
+
+    const progressInfoBtn = document.getElementById('progress-info-btn');
+    const progressInfoPopup = document.getElementById('progress-info-popup');
+    const progressInfoCloseBtn = document.getElementById('progress-info-close');
+     // --- progress info popup elements ---
+   if (progressInfoBtn && progressInfoPopup) {
+        progressInfoBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            progressInfoPopup.classList.toggle('hidden');
+            progressInfoPopup.setAttribute('aria-hidden', progressInfoPopup.classList.contains('hidden'));
+        });
+        progressInfoCloseBtn?.addEventListener('click', () => {
+            progressInfoPopup.classList.add('hidden');
+            progressInfoPopup.setAttribute('aria-hidden', 'true');
+        });
+        // click outside to close
+        document.addEventListener('click', (e) => {
+            if (!progressInfoPopup.classList.contains('hidden') && !progressInfoPopup.contains(e.target) && e.target !== progressInfoBtn) {
+                progressInfoPopup.classList.add('hidden');
+                progressInfoPopup.setAttribute('aria-hidden', 'true');
+            }
+        });
+    }
 
 
     // =================================================================
@@ -236,16 +267,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const updateMuscleMap = () => {
-        const muscleCounts = {};
-        allMuscles.forEach(m => muscleCounts[m] = 0);
-        workouts.forEach(w => {
-            if (w.muscle in muscleCounts) {
-                muscleCounts[w.muscle]++;
-            }
-        });
-
-        // reuse week range
-        const { startOfWeek, endOfWeek } = getWeekRange();
+        const { startOfWeek, endOfWeek, dateStrings } = getWeekRange();
 
         const parseDate = (d) => {
             if (!d) return null;
@@ -254,6 +276,19 @@ document.addEventListener('DOMContentLoaded', () => {
             if (d instanceof Date) return d;
             return null;
         };
+
+        // Count only workouts that fall within the current week (based on dateStrings)
+        const muscleCounts = {};
+        allMuscles.forEach(m => muscleCounts[m] = 0);
+        workouts.forEach(w => {
+            if (!(w.muscle in muscleCounts)) return;
+            const d = parseDate(w.date);
+            if (!d) return;
+            const isoDate = d.toISOString().split('T')[0];
+            if (dateStrings.includes(isoDate)) {
+                muscleCounts[w.muscle]++;
+            }
+        });
 
         allMuscles.forEach(muscleName => {
             const circleEl = document.querySelector(`.muscle-circle[data-muscle="${muscleName}"]`);
@@ -317,7 +352,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         for (let i = 0; i < 7; i++) {
             const dateString = dateStrings[i];
-            const hasWorkout = workouts.some(w => w.date === dateString);
+            const hasWorkout = workouts.some(w => normalizeToIsoDate(w.date) === dateString);
             const isToday = dateString === new Date().toISOString().split('T')[0];
 
             const dayElement = document.createElement('div');
@@ -326,14 +361,14 @@ document.addEventListener('DOMContentLoaded', () => {
             dayElement.dataset.dayName = dayNames[i];
             dayElement.innerHTML = `
                 <span class="text-sm font-medium" style="color: ${isToday ? 'var(--accent-color)' : 'var(--text-secondary)'};">${dayNames[i]}</span>
-                <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-full" style="background-color: ${hasWorkout ? 'var(--highlight-color)' : 'var(--bg-secondary)'}; ${isToday ? 'outline: 2px solid var(--accent-color);' : 'border: 2px solid var(--border-color)'}"></div>
+                <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-full" style="background-color: ${hasWorkout ? 'var(--highlight-color)' : 'var(--bg-secondary)'}; ${isToday ? 'outline: 3px dashed var(--border-color);' : 'border: 2px solid var(--accent-color)'}"></div>
             `;
             weeklyDaysContainer.appendChild(dayElement);
         }
     };
 
     const showDayDetailPopup = (dateString, dayName, targetElement) => {
-        const workoutsForDay = workouts.filter(w => w.date === dateString);
+        const workoutsForDay = workouts.filter(w => normalizeToIsoDate(w.date) === dateString);
         const musclesTrained = [...new Set(workoutsForDay.map(w => w.muscle))];
 
         popupDateTitle.textContent = `${dayName} (${formatDate(dateString)})`;
@@ -755,7 +790,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // =================================================================
 
     const init = async () => {
-        applyTheme(localStorage.getItem('theme') || 'dark');
+
         createMuscleDashboard();
 
         try {

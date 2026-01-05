@@ -22,8 +22,8 @@ if ('serviceWorker' in navigator) {
     const css = `
                 #action-btn-SYS {
                     position: fixed;
-                    top: 24px;
-                    left: 24px;
+                    top: 1rem;
+                    left: 1rem;
                     z-index: 1000;
                     width: 48px;
                     height: 48px;
@@ -176,7 +176,7 @@ tab.innerHTML = `
             <div id="tab-auth">
                 <button id="login-google" type="button">Đăng nhập Google</button>
                 <button id="logout-google" type="button">Đăng xuất</button>
-                <div id="user-info"></div>
+                <div id="user-info" style="overflow-wrap: break-word;"></div>
             </div>
             <div id="tab-update">
                 <button id="update-sw" type="button">Check for Updates</button>

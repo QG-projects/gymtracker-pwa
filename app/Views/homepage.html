@@ -36,15 +36,39 @@
 </head>
 
 <body>
-    <button id="theme-toggle-btn" title="Chuyển theme">
+    <!-- <button id="theme-toggle-btn" title="Chuyển theme">
         <span id="dark-icon" class="material-symbols-outlined">dark_mode</span>
         <span id="light-icon" class="material-symbols-outlined">light_mode</span>
+    </button> -->
+
+    <button id="progress-info-btn" title="Thông tin biểu tượng">
+        <span class="material-symbols-outlined">info</span>
     </button>
+
+    <div id="progress-info-popup" class="popup hidden" role="dialog" aria-hidden="true"
+        style="position:fixed;top:60px;right:20px;z-index:1000;min-width:240px;padding:12px;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.12);background:var(--bg-secondary);">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <strong style="font-size:14px;color:var(--text-primary)">Ý nghĩa biểu tượng</strong>
+            <button id="progress-info-close" class="btn-icon" aria-label="Đóng"
+                style="background:none;border:none;cursor:pointer;"><span
+                    class="material-symbols-outlined">close</span></button>
+        </div>
+        <ul style="list-style:none;padding:0;margin:0;gap:8px;display:flex;flex-direction:column;">
+            <li style="display:flex;align-items:center;gap:8px;"><span class="material-symbols-outlined"
+                    style="color:var(--text-primary)">arrow_circle_right</span><span
+                    style="color:var(--text-primary)">Tiến bộ: tăng khối lượng</span></li>
+            <li style="display:flex;align-items:center;gap:8px;"><span class="material-symbols-outlined"
+                    style="color:var(--md-sys-color-success)">flag</span><span style="color:var(--text-primary)">Đạt
+                    mục tiêu: khối lượng giữ nhưng tăng rep</span></li>
+            <li style="display:flex;align-items:center;gap:8px;"><span class="material-symbols-outlined"
+                    style="color:var(--danger-color)">line_end</span><span style="color:var(--text-primary)">Không có
+                    tiến triển / khác</span></li>
+        </ul>
+    </div>
 
     <div class="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
         <header class="text-center mb-8">
             <h1 class="text-3xl sm:text-4xl font-bold text-primary">Gym Workout Tracker</h1>
-            <p class="text-secondary mt-2">Nhấn vào nhóm cơ để ghi lại buổi tập của bạn</p>
         </header>
 
         <div class="flex justify-center space-x-2 sm:space-x-4 mb-6 sm:mb-8 p-2 rounded-lg bg-secondary">
@@ -105,7 +129,8 @@
                     <table class="w-full text-left">
                         <thead class="sticky top-0 bg-secondary">
                             <tr>
-                                <th class="p-3 w-12"><input type="checkbox" id="select-all-measurements-checkbox"class="data-table-checkbox"></th>
+                                <th class="p-3 w-12"><input type="checkbox" id="select-all-measurements-checkbox"
+                                        class="data-table-checkbox"></th>
                                 <th class="p-3 text-primary">Ngày</th>
                                 <th class="p-3 text-primary">Cân nặng</th>
                                 <th class="p-3 text-primary">Ngực</th>
