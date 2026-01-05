@@ -511,6 +511,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const userId = auth.currentUser.uid; // Lấy ID người dùng đã đăng nhập
             const workouts = await getWorkoutsFromFirestore(userId); // Lấy dữ liệu từ Firestore
 
+            // cập nhật biến toàn cục và các option bộ lọc trước khi đọc filterSelect.value
+            window.workouts = workouts || [];
+            updateFilterOptions();
+
             const searchTerm = searchInput.value.toLowerCase();
             const filterValue = filterSelect.value;
             const filteredWorkouts = workouts
