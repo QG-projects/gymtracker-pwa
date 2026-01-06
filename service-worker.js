@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pwa-gym-tracker-cache-v1';
+const CACHE_NAME = 'pwa-gym-tracker-cache-v2';
 const urlsToCache = [
     './index.html',
     './app/Views/homepage.html',
@@ -7,7 +7,7 @@ const urlsToCache = [
     './app/Views/css/style.css',
     './js/app.js',
     './js/js-main.js',
-    './js/read-write-data.js',  
+    './js/read-write-data.js',
     './js/firebase-config.js',
     './js/firebase-connect.js',
     './images/icon-192x192.png',
@@ -75,6 +75,7 @@ self.addEventListener('activate', event => {
     );
     self.clients.claim();
 });
+
 // Hai biến toàn cục để lưu version manifest
 let GLOBAL_CACHED_MANIFEST_VER = null;
 let GLOBAL_FETCHED_MANIFEST_VER = null;

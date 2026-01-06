@@ -20,10 +20,10 @@ navigator.serviceWorker.addEventListener('message', event => {
     if (message.type === 'UPDATE_PROGRESS') {
         console.log(`[Client] Progress: ${message.progress}% for file: ${message.file}`);
         progressBar.style.width = `${message.progress}%`;
-        // ghi ra các file đã tải
-        // const li = document.createElement('li');
-        // li.textContent = `Downloading: ${message.file}`;
-        // fileList.appendChild(li);
+
+        const li = document.createElement('li');
+        li.textContent = `Downloading: ${message.file}`;
+        fileList.appendChild(li);
     } else if (message.type === 'UPDATE_COMPLETE') {
         console.log('[Client] Update complete! Showing back button.');
         backBtn.style.display = 'block';
