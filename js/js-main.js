@@ -179,8 +179,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const progressInfoBtn = document.getElementById('progress-info-btn');
     const progressInfoPopup = document.getElementById('progress-info-popup');
     const progressInfoCloseBtn = document.getElementById('progress-info-close');
-     // --- progress info popup elements ---
-   if (progressInfoBtn && progressInfoPopup) {
+    // --- progress info popup elements ---
+    if (progressInfoBtn && progressInfoPopup) {
         progressInfoBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             progressInfoPopup.classList.toggle('hidden');
@@ -511,9 +511,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const userId = auth.currentUser.uid; // Lấy ID người dùng đã đăng nhập
             const workouts = await getWorkoutsFromFirestore(userId); // Lấy dữ liệu từ Firestore
 
-            // cập nhật biến toàn cục và các option bộ lọc trước khi đọc filterSelect.value
-            window.workouts = workouts || [];
-            updateFilterOptions();
+            // // cập nhật biến toàn cục và các option bộ lọc trước khi đọc filterSelect.value
+            // window.workouts = workouts || [];
+            // updateFilterOptions();
 
             const searchTerm = searchInput.value.toLowerCase();
             const filterValue = filterSelect.value;
@@ -802,7 +802,7 @@ document.addEventListener('DOMContentLoaded', () => {
             auth.onAuthStateChanged(async (user) => {
                 if (user) {
                     const userId = user.uid; // Lấy ID người dùng đã đăng nhập
-                    console.log('Lấy ID người dùng đã đăng nhập:', userId);
+                    // console.log('Lấy ID người dùng đã đăng nhập:', userId);
 
                     // Lấy dữ liệu từ Firestore
                     const workouts = await getWorkoutsFromFirestore(userId); // Lấy danh sách bài tập
@@ -815,6 +815,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     window.weightConfig = configurations.weightConfig || [];
                     window.repConfig = configurations.repConfig || [];
 
+                    // cập nhật options bộ lọc sau khi đã có dữ liệu workouts
+                    updateFilterOptions();
                     // Cập nhật giao diện
                     updateMuscleMap();
                     renderWeeklyView();

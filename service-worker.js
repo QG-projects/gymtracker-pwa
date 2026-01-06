@@ -75,6 +75,9 @@ self.addEventListener('activate', event => {
     );
     self.clients.claim();
 });
+// Hai biến toàn cục để lưu version manifest
+let GLOBAL_CACHED_MANIFEST_VER = null;
+let GLOBAL_FETCHED_MANIFEST_VER = null;
 
 // Sự kiện message:
 // - Được kích hoạt khi nhận được tin nhắn từ client (trang web).
@@ -84,7 +87,7 @@ self.addEventListener('message', async event => {
 
     if (event.data && event.data.type === 'CHECK_FOR_UPDATE') {
         console.log('[Service Worker] Starting update process...');
-        
+
         // Fetch manifest mới từ server
         const response = await fetch('./manifest.json');
         const newManifest = await response.json();
@@ -140,4 +143,37 @@ self.addEventListener('message', async event => {
             });
         }
     }
+
+    // Xử lý sự kiện CHECKVERSION
+    if (event.data && (event.data.type === 'CHECKVERSION' || event.data.type === 'checkversion')) {
+        console.log('[Service Worker] CHECKVERSION event triggered');
+
+        try {
+            // Lấy manifest mới từ server
+            const response = await fetch('./manifest.json');
+            const newManifest = await response.json();
+
+            // Lấy manifest cũ từ cache (nếu có)
+            const cachedManifest = await caches.match('./manifest.json').then(res => res ? res.json() : null);
+
+            // Chỉ gán vào biến toàn cục (không gửi message, không cập nhật cache)
+            GLOBAL_FETCHED_MANIFEST_VER = newManifest && newManifest.ver ? newManifest.ver : null;
+            GLOBAL_CACHED_MANIFEST_VER = cachedManifest && cachedManifest.ver ? cachedManifest.ver : null;
+
+            // Gửi kết quả về client (đơn giản)
+            self.clients.matchAll().then(clients => {
+                clients.forEach(client => {
+                    client.postMessage({
+                        type: 'CHECKVERSION_DONE',
+                        fetchedVer: GLOBAL_FETCHED_MANIFEST_VER,
+                        cachedVer: GLOBAL_CACHED_MANIFEST_VER
+                    });
+                });
+            });
+        } catch (err) {
+            console.error('[Service Worker] CHECKVERSION error:', err);
+        }
+    }
 });
+
+

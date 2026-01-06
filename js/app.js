@@ -1,20 +1,20 @@
-if ('serviceWorker' in navigator) {
-    // Chỉ lắng nghe thông điệp từ Service Worker, không đăng ký lại
-    navigator.serviceWorker.addEventListener('message', event => {
-        const log = document.getElementById('sw-log');
-        const message = event.data;
+// if ('serviceWorker' in navigator) {
+//     // Chỉ lắng nghe thông điệp từ Service Worker, không đăng ký lại
+//     navigator.serviceWorker.addEventListener('message', event => {
+//         const log = document.getElementById('sw-log');
+//         const message = event.data;
 
-        if (message.type === 'CACHE_HIT') {
-            const li = document.createElement('li');
-            li.textContent = `Cache hit: ${message.url}`;
-            log.appendChild(li);
-        } else if (message.type === 'NETWORK_FETCH') {
-            const li = document.createElement('li');
-            li.textContent = `Network fetch: ${message.url}`;
-            log.appendChild(li);
-        }
-    });
-}
+//         if (message.type === 'CACHE_HIT') {
+//             const li = document.createElement('li');
+//             li.textContent = `Cache hit: ${message.url}`;
+//             log.appendChild(li);
+//         } else if (message.type === 'NETWORK_FETCH') {
+//             const li = document.createElement('li');
+//             li.textContent = `Network fetch: ${message.url}`;
+//             log.appendChild(li);
+//         }
+//     });
+// }
 
 
 // Inject CSS at runtime so the page has no static <style> block
@@ -228,4 +228,44 @@ document.addEventListener('click', (e) => {
 const updateBtn = tab.querySelector('#update-sw');
 updateBtn.addEventListener('click', () => {
     window.location.href = './update-progress.html';
+});
+
+
+async function checkManifestVersionAndMarkButton() {
+    // Chỉ dùng SW: gửi CHECKVERSION và chờ CHECKVERSION_DONE
+    if (!navigator.serviceWorker || !navigator.serviceWorker.controller) return;
+    return new Promise(resolve => {
+        const onMessage = (event) => {
+            const msg = event.data;
+            if (!msg) return;
+            if (msg.type === 'CHECKVERSION_DONE') {
+                navigator.serviceWorker.removeEventListener('message', onMessage);
+                const fetchedVer = msg.fetchedVer || null;
+                const cachedVer = msg.cachedVer || null;
+                if (cachedVer && fetchedVer && cachedVer !== fetchedVer) {
+                    updateBtn.textContent = `New Version ${fetchedVer}`;
+                    actionBtn.innerHTML = `<span class="material-symbols-outlined" style="font-size:32px; color:var(--md-sys-color-on-primary);">priority_high</span>`;
+                    actionBtn.style.background = '#ab0d0bff';
+                    updateBtn.style.background = '#ab0d0bff';
+                    updateBtn.style.color = '#fff';
+                    updateBtn.setAttribute('data-update-available', fetchedVer);
+                }
+                resolve();
+            }
+        };
+
+        navigator.serviceWorker.addEventListener('message', onMessage);
+        navigator.serviceWorker.controller.postMessage({ type: 'CHECKVERSION' });
+
+        // timeout bảo đảm không treo nếu không có phản hồi
+        setTimeout(() => {
+            navigator.serviceWorker.removeEventListener('message', onMessage);
+            resolve();
+        }, 1500);
+    });
+}
+
+// Chạy sau khi DOM sẵn sàng
+window.addEventListener('DOMContentLoaded', () => {
+    checkManifestVersionAndMarkButton();
 });
