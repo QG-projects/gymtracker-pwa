@@ -80,88 +80,221 @@ self.addEventListener('activate', event => {
 let GLOBAL_CACHED_MANIFEST_VER = null;
 let GLOBAL_FETCHED_MANIFEST_VER = null;
 
-// Sự kiện message:
-// - Được kích hoạt khi nhận được tin nhắn từ client (trang web).
-// - Dùng để kiểm tra và cập nhật phiên bản cache khi có yêu cầu từ client.
+// // Sự kiện message:
+// // - Được kích hoạt khi nhận được tin nhắn từ client (trang web).
+// // - Dùng để kiểm tra và cập nhật phiên bản cache khi có yêu cầu từ client.
+// self.addEventListener('message', async event => {
+//     console.log('[Service Worker] Message event:', event.data);
+
+//     if (event.data && event.data.type === 'CHECK_FOR_UPDATE') {
+//         console.log('[Service Worker] Starting update process...');
+
+//         // Fetch manifest mới từ server
+//         const response = await fetch('./manifest.json');
+//         const newManifest = await response.json();
+
+//         // Lấy manifest cũ từ cache
+//         const cachedManifest = await caches.match('./manifest.json').then(res => res ? res.json() : null);
+
+//         // Kiểm tra phiên bản mới
+//         if (cachedManifest && cachedManifest.ver !== newManifest.ver) {
+//             console.log('New version detected:', newManifest.ver);
+
+//             // Xóa cache cũ
+//             await caches.delete(CACHE_NAME);
+//             const cache = await caches.open(CACHE_NAME);
+
+//             // Danh sách file cần cache
+//             const filesToCache = urlsToCache;
+//             let progress = 0;
+
+//             // Cache từng file và gửi tiến trình cập nhật
+//             for (let i = 0; i < filesToCache.length; i++) {
+//                 const file = filesToCache[i];
+//                 await cache.add(file);
+//                 progress = Math.floor(((i + 1) / filesToCache.length) * 100);
+
+//                 // Gửi tiến trình cập nhật đến client
+//                 self.clients.matchAll().then(clients => {
+//                     clients.forEach(client => {
+//                         client.postMessage({
+//                             type: 'UPDATE_PROGRESS',
+//                             progress,
+//                             file
+//                         });
+//                     });
+//                 });
+//             }
+
+//             console.log('Cache updated with new version.');
+
+//             // Gửi thông điệp hoàn tất cập nhật
+//             self.clients.matchAll().then(clients => {
+//                 clients.forEach(client => {
+//                     client.postMessage({ type: 'UPDATE_COMPLETE' });
+//                 });
+//             });
+//         } else {
+//             console.log('No new version detected.');
+//             // Gửi thông điệp không có bản cập nhật
+//             self.clients.matchAll().then(clients => {
+//                 clients.forEach(client => {
+//                     client.postMessage({ type: 'NO_UPDATE' });
+//                 });
+//             });
+//         }
+//     }
+
+//     // Xử lý sự kiện CHECKVERSION
+//     if (event.data && (event.data.type === 'CHECKVERSION' || event.data.type === 'checkversion')) {
+//         console.log('[Service Worker] CHECKVERSION event triggered');
+
+//         try {
+//             // Lấy manifest mới từ server
+//             const response = await fetch('./manifest.json');
+//             const newManifest = await response.json();
+
+//             // Lấy manifest cũ từ cache (nếu có)
+//             const cachedManifest = await caches.match('./manifest.json').then(res => res ? res.json() : null);
+
+//             // Chỉ gán vào biến toàn cục (không gửi message, không cập nhật cache)
+//             GLOBAL_FETCHED_MANIFEST_VER = newManifest && newManifest.ver ? newManifest.ver : null;
+//             GLOBAL_CACHED_MANIFEST_VER = cachedManifest && cachedManifest.ver ? cachedManifest.ver : null;
+
+//             // Gửi kết quả về client (đơn giản)
+//             self.clients.matchAll().then(clients => {
+//                 clients.forEach(client => {
+//                     client.postMessage({
+//                         type: 'CHECKVERSION_DONE',
+//                         fetchedVer: GLOBAL_FETCHED_MANIFEST_VER,
+//                         cachedVer: GLOBAL_CACHED_MANIFEST_VER
+//                     });
+//                 });
+//             });
+//         } catch (err) {
+//             console.error('[Service Worker] CHECKVERSION error:', err);
+//         }
+//     }
+// });
+
+
+// Helper: đọc CSV và trả về {ver, information, raw}
+async function fetchLatestVersionFromCsv(url = './updated-version.csv') {
+    try {
+        const resp = await fetch(url, { cache: 'no-store' });
+        if (!resp.ok) return null;
+        const txt = await resp.text();
+        const lines = txt.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+        if (lines.length < 2) return null;
+        const lastLine = lines[lines.length - 1];
+        const cols = lastLine.split(',');
+        return {
+            ver: cols[0] ? cols[0].trim() : null,
+            information: cols.length > 1 ? cols.slice(1).join(',').trim() : '',
+            raw: txt
+        };
+    } catch (err) {
+        console.error('[Service Worker] fetchLatestVersionFromCsv error:', err);
+        return null;
+    }
+}
+
 self.addEventListener('message', async event => {
     console.log('[Service Worker] Message event:', event.data);
 
     if (event.data && event.data.type === 'CHECK_FOR_UPDATE') {
         console.log('[Service Worker] Starting update process...');
 
-        // Fetch manifest mới từ server
-        const response = await fetch('./manifest.json');
-        const newManifest = await response.json();
+        // Lấy CSV mới từ server
+        const fetchedCsv = await fetchLatestVersionFromCsv();
+        if (!fetchedCsv || !fetchedCsv.ver) {
+            console.log('No valid fetched CSV/version.');
+            self.clients.matchAll().then(clients => clients.forEach(c => c.postMessage({ type: 'NO_UPDATE' })));
+            return;
+        }
 
-        // Lấy manifest cũ từ cache
-        const cachedManifest = await caches.match('./manifest.json').then(res => res ? res.json() : null);
+        // Lấy CSV cũ từ cache (nếu có)
+        let cachedVer = null;
+        const cachedResp = await caches.match('./updated-version.csv');
+        if (cachedResp) {
+            try {
+                const cachedTxt = await cachedResp.text();
+                const lines = cachedTxt.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+                if (lines.length >= 2) {
+                    const last = lines[lines.length - 1].split(',');
+                    cachedVer = last[0] ? last[0].trim() : null;
 
-        // Kiểm tra phiên bản mới
-        if (cachedManifest && cachedManifest.ver !== newManifest.ver) {
-            console.log('New version detected:', newManifest.ver);
+                }
+            } catch (e) {
+                console.warn('Failed to read cached CSV:', e);
+            }
+        }
 
-            // Xóa cache cũ
+        if (cachedVer !== fetchedCsv.ver) {
+            console.log('New version detected:', fetchedCsv.ver);
+
+            // Xóa cache cũ và tạo cache mới
             await caches.delete(CACHE_NAME);
             const cache = await caches.open(CACHE_NAME);
 
-            // Danh sách file cần cache
-            const filesToCache = urlsToCache;
-            let progress = 0;
+            // Cache danh sách file (bao gồm CSV)
+            const filesToCache = urlsToCache.concat(['./updated-version.csv']);
 
-            // Cache từng file và gửi tiến trình cập nhật
+            let progress = 0;
             for (let i = 0; i < filesToCache.length; i++) {
                 const file = filesToCache[i];
-                await cache.add(file);
+                try {
+                    await cache.add(file);
+                } catch (err) {
+                    console.warn('Failed to cache', file, err);
+                }
                 progress = Math.floor(((i + 1) / filesToCache.length) * 100);
-
-                // Gửi tiến trình cập nhật đến client
                 self.clients.matchAll().then(clients => {
-                    clients.forEach(client => {
-                        client.postMessage({
-                            type: 'UPDATE_PROGRESS',
-                            progress,
-                            file
-                        });
-                    });
+                    clients.forEach(client => client.postMessage({ type: 'UPDATE_PROGRESS', progress, file, information: fetchedCsv.information }));
                 });
             }
 
+            // Đảm bảo CSV mới được lưu (nếu fetch trả raw)
+            try {
+                await cache.put('./updated-version.csv', new Response(fetchedCsv.raw, { headers: { 'Content-Type': 'text/csv' } }));
+            } catch (e) { /* ignore */ }
+
             console.log('Cache updated with new version.');
 
-            // Gửi thông điệp hoàn tất cập nhật
             self.clients.matchAll().then(clients => {
-                clients.forEach(client => {
-                    client.postMessage({ type: 'UPDATE_COMPLETE' });
-                });
+                clients.forEach(client => client.postMessage({ type: 'UPDATE_COMPLETE' }));
             });
         } else {
             console.log('No new version detected.');
-            // Gửi thông điệp không có bản cập nhật
-            self.clients.matchAll().then(clients => {
-                clients.forEach(client => {
-                    client.postMessage({ type: 'NO_UPDATE' });
-                });
-            });
+            self.clients.matchAll().then(clients => clients.forEach(client => client.postMessage({ type: 'NO_UPDATE' })));
         }
     }
 
-    // Xử lý sự kiện CHECKVERSION
+    // Xử lý CHECKVERSION: trả về version fetched và cached từ CSV
     if (event.data && (event.data.type === 'CHECKVERSION' || event.data.type === 'checkversion')) {
         console.log('[Service Worker] CHECKVERSION event triggered');
 
         try {
-            // Lấy manifest mới từ server
-            const response = await fetch('./manifest.json');
-            const newManifest = await response.json();
+            const fetchedCsv = await fetchLatestVersionFromCsv();
+            let fetchedVer = fetchedCsv && fetchedCsv.ver ? fetchedCsv.ver : null;
 
-            // Lấy manifest cũ từ cache (nếu có)
-            const cachedManifest = await caches.match('./manifest.json').then(res => res ? res.json() : null);
+            // Lấy CSV cũ từ cache
+            let cachedVer = null;
+            const cachedResp = await caches.match('./updated-version.csv');
+            if (cachedResp) {
+                try {
+                    const cachedTxt = await cachedResp.text();
+                    const lines = cachedTxt.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+                    if (lines.length >= 2) {
+                        const last = lines[lines.length - 1].split(',');
+                        cachedVer = last[0] ? last[0].trim() : null;
+                    }
+                } catch (e) { /* ignore */ }
+            }
 
-            // Chỉ gán vào biến toàn cục (không gửi message, không cập nhật cache)
-            GLOBAL_FETCHED_MANIFEST_VER = newManifest && newManifest.ver ? newManifest.ver : null;
-            GLOBAL_CACHED_MANIFEST_VER = cachedManifest && cachedManifest.ver ? cachedManifest.ver : null;
+            GLOBAL_FETCHED_MANIFEST_VER = fetchedVer;
+            GLOBAL_CACHED_MANIFEST_VER = cachedVer;
 
-            // Gửi kết quả về client (đơn giản)
             self.clients.matchAll().then(clients => {
                 clients.forEach(client => {
                     client.postMessage({
@@ -176,5 +309,3 @@ self.addEventListener('message', async event => {
         }
     }
 });
-
-

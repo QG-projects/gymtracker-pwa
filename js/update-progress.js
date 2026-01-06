@@ -21,6 +21,16 @@ navigator.serviceWorker.addEventListener('message', event => {
         console.log(`[Client] Progress: ${message.progress}% for file: ${message.file}`);
         progressBar.style.width = `${message.progress}%`;
 
+        const info = message.information || '';
+        // Tách theo dấu chấm, trim, bỏ phần rỗng, sau đó nối lại và thêm <br> giữa các câu
+        const formatted = info
+            .split('.')
+            .map(s => s.trim())
+            .filter(s => s.length)
+            .map(s => `${s}.`)
+            .join('<br>');
+        fileList.innerHTML = formatted;
+
         // const li = document.createElement('li');
         // li.textContent = `Downloading: ${message.file}`;
         // fileList.appendChild(li);
