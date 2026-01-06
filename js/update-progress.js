@@ -21,9 +21,9 @@ navigator.serviceWorker.addEventListener('message', event => {
         console.log(`[Client] Progress: ${message.progress}% for file: ${message.file}`);
         progressBar.style.width = `${message.progress}%`;
 
-        const li = document.createElement('li');
-        li.textContent = `Downloading: ${message.file}`;
-        fileList.appendChild(li);
+        // const li = document.createElement('li');
+        // li.textContent = `Downloading: ${message.file}`;
+        // fileList.appendChild(li);
     } else if (message.type === 'UPDATE_COMPLETE') {
         console.log('[Client] Update complete! Showing back button.');
         backBtn.style.display = 'block';
