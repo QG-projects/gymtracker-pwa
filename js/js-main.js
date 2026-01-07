@@ -743,7 +743,8 @@ document.addEventListener('DOMContentLoaded', () => {
         container.innerHTML = '';
         config.forEach(value => {
             const button = document.createElement('button');
-            button.className = 'btn-secondary weight-config-item';
+            button.className = 'btn-secondary';
+            button.style.minWidth='80px';
             button.textContent = `${value} ${unit}`;
             button.addEventListener('click', () => deleteCallback(value));
             container.appendChild(button);
