@@ -6,7 +6,7 @@
     "display": "standalone",
     "orientation": "portrait",
     "background_color": "#313647",
-    "theme_color": "#313647",
+    "theme_color": "#f5f5f8",
     "description": "A simple gym tracker app with offline support.",
     "lang": "vi-VN",
     "ver": "1.0.1",
