@@ -411,12 +411,12 @@ html.light .btn-secondary {
 }
 .nav-bottom {
     position: fixed;
-    bottom: 20px;          /* Cách đáy màn hình 20px */
+    bottom: 5px;          /* Cách đáy màn hình 20px */
     left: 50%;             /* Đẩy sang phải 50% chiều rộng màn hình */
     transform: translateX(-50%); /* Kéo ngược lại 50% chiều rộng bản thân để vào đúng giữa */
     z-index: 1000;
     border-width: 2px;
-    width: 80%; /* Chiếm gần hết chiều*/
+    width: 90%; /* Chiếm gần hết chiều*/
 }
 #tab-tracker-content, #tab-personal-content {
     padding-bottom: 100px;
