@@ -68,6 +68,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const filterSelect = document.getElementById('filter-select');
     const deleteSelectedWorkoutsBtn = document.getElementById('delete-selected-workouts-btn');
     const selectAllWorkoutsCheckbox = document.getElementById('select-all-workouts-checkbox');
+    const showWorkoutHistoryBtn = document.getElementById('show-workout-history-btn');
+    const historyCards = document.getElementById('history-cards');
 
     // --- Tab "Personal" - Số đo cơ thể ---
     const addMeasurementBtn = document.getElementById('add-measurement-btn');
@@ -78,6 +80,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const mDateInput = measurementModal.querySelector('#measurement-date-input');
     const mWeightInput = measurementModal.querySelector('#measurement-weight-input');
     const mChestInput = measurementModal.querySelector('#measurement-chest-input');
+    const mHeightInput = measurementModal.querySelector('#measurement-height-input');
     const mWaistInput = measurementModal.querySelector('#measurement-waist-input');
     const mHipsInput = measurementModal.querySelector('#measurement-hips-input');
     const mArmInput = measurementModal.querySelector('#measurement-arm-input');
@@ -86,14 +89,55 @@ document.addEventListener('DOMContentLoaded', () => {
     const selectAllMeasurementsCheckbox = document.getElementById('select-all-measurements-checkbox');
 
     // --- Tab "Personal" - Cấu hình tập luyện ---
-    const newWeightInput = document.getElementById('new-weight-input');
-    const newRepInput = document.getElementById('new-rep-input');
-    const addWeightBtn = document.getElementById('add-weight-btn');
-    const addRepBtn = document.getElementById('add-rep-btn');
+    const newWeightInputs = Array.from(document.querySelectorAll('#new-weight-input'));
+    const newRepInputs = Array.from(document.querySelectorAll('#new-rep-input'));
+    const addWeightBtns = Array.from(document.querySelectorAll('#add-weight-btn'));
+    const addRepBtns = Array.from(document.querySelectorAll('#add-rep-btn'));
     const weightConfigContainer = document.getElementById('weight-config-container');
     const repConfigContainer = document.getElementById('rep-config-container');
 
 
+    // =================================================================
+    // 2. QUẢN LÝ HIỂN THỊ LỊCH SỬ TẬP LUYỆN (WORKOUT HISTORY VISIBILITY)
+    // =================================================================
+    const showHistoryCards = () => {
+        historyCards.classList.remove('hidden');
+        historyCards.setAttribute('aria-hidden', 'false');
+        showWorkoutHistoryBtn.textContent = 'Ẩn lịch sử tập luyện';
+    };
+
+    // Hide only: hide cards and update button text (single responsibility)
+    const hideHistoryCards = () => {
+        historyCards.classList.add('hidden');
+        historyCards.setAttribute('aria-hidden', 'true');
+        showWorkoutHistoryBtn.textContent = 'Hiển thị lịch sử tập luyện';
+    };
+    // Clear only: remove table contents and reset related controls (single responsibility)
+    const clearHistoryTables = () => {
+        if (historyTableBody) historyTableBody.innerHTML = '';
+        if (measurementsTableBody) measurementsTableBody.innerHTML = '';
+        if (deleteSelectedWorkoutsBtn) deleteSelectedWorkoutsBtn.classList.add('hidden');
+        if (deleteSelectedMeasurementsBtn) deleteSelectedMeasurementsBtn.classList.add('hidden');
+        if (selectAllWorkoutsCheckbox) selectAllWorkoutsCheckbox.checked = false;
+        if (selectAllMeasurementsCheckbox) selectAllMeasurementsCheckbox.checked = false;
+    };
+
+    // Load only: fetch & render both history and measurements (single responsibility)
+    const loadHistoryTables = async () => {
+        await renderHistoryTable();
+        await renderBodyMeasurementsTable();
+    };
+
+    // Toggle behavior wired to a single click handler (single responsibility)
+    showWorkoutHistoryBtn.addEventListener('click', async () => {
+        if (historyCards.classList.contains('hidden')) {
+            showHistoryCards();
+            await loadHistoryTables();
+        } else {
+            hideHistoryCards();
+            clearHistoryTables();
+        }
+    });
     // =================================================================
     // 3. CÁC HÀM TIỆN ÍCH & LÕI (CORE & UTILITY FUNCTIONS)
     // =================================================================
@@ -123,6 +167,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const year = date.getFullYear();
         return `${day}/${month}/${year}`;
     };
+
 
     const openModal = (modal) => modal.classList.add('open');
     const closeModal = (modal) => modal.classList.remove('open');
@@ -219,8 +264,8 @@ document.addEventListener('DOMContentLoaded', () => {
         tabTrackerBtn.classList.replace('tab-active', 'tab-inactive');
         tabPersonalContent.classList.add('tab-content-active');
         tabTrackerContent.classList.remove('tab-content-active');
-        renderBodyMeasurementsTable();
-        renderHistoryTable();
+        // renderBodyMeasurementsTable();
+        // renderHistoryTable();
         renderAllConfigs();
     });
 
@@ -232,21 +277,31 @@ document.addEventListener('DOMContentLoaded', () => {
     const getLatestWeight = (muscleName) => {
         const muscleWorkouts = workouts
             .filter(w => w.muscle === muscleName && w.weight)
-            .sort((a, b) => new Date(b.date) - new Date(a.date));
+            .sort((a, b) => {
+                // Sắp xếp theo số giây (seconds) của Firebase Timestamp
+                // b.date.seconds - a.date.seconds => Mới nhất lên đầu
+                return b.createdAt.seconds - a.createdAt.seconds;
+            });
+
         return (muscleWorkouts.length > 0) ? muscleWorkouts[0].weight : 0;
     };
 
-    const getLatestRep = (muscleName) => {
+
+    const getLatestRep = (muscleName) => {  
         const muscleWorkouts = workouts
             .filter(w => w.muscle === muscleName && w.rep)
-            .sort((a, b) => new Date(b.date) - new Date(a.date));
+            .sort((a, b) => {
+                return b.createdAt.seconds - a.createdAt.seconds;
+            });
         return (muscleWorkouts.length > 0) ? muscleWorkouts[0].rep : 0;
     };
 
     const getProgressIcon = (muscleName) => {
         const muscleWorkouts = workouts
             .filter(w => w.muscle === muscleName && w.weight && w.rep)
-            .sort((a, b) => new Date(a.date) - new Date(b.date));
+            .sort((a, b) => {
+                return b.date.seconds - a.date.seconds;
+            });
 
         if (muscleWorkouts.length < 2) return { icon: "line_end", color: "var(--danger-color)" };
 
@@ -460,18 +515,21 @@ document.addEventListener('DOMContentLoaded', () => {
         if (muscle) {
             try {
                 const userId = auth.currentUser.uid; // Lấy ID người dùng đã đăng nhập
-                const newWorkout = { muscle, date: selectedDate, weight: newWeight, rep: newRep };
                 await addWorkoutToFirestore(userId, muscle, selectedDate, newWeight, newRep); // Lưu bài tập vào Firestore
-
+                
+                // Chuẩn hóa dữ liệu để thêm vào biến toàn cục `workouts`
+                const createdAtTimestampLike = { seconds: Math.floor(Date.now() / 1000), nanoseconds: 0 };
+                const newWorkoutForLocal = { muscle, date: selectedDate, weight: newWeight, rep: newRep, createdAt: createdAtTimestampLike };
                 // Cập nhật biến toàn cục `workouts`
-                window.workouts.push(newWorkout);
+                window.workouts.push(newWorkoutForLocal);
 
                 // Cập nhật giao diện
-                renderWeeklyView();
                 updateMuscleMap();
-                if (tabPersonalContent.classList.contains('tab-content-active')) {
-                    renderHistoryTable();
-                }
+                renderWeeklyView();
+
+                // if (tabPersonalContent.classList.contains('tab-content-active')) {
+                //     renderHistoryTable();
+                // }
             } catch (error) {
                 console.error('Error saving workout to Firestore:', error);
             }
@@ -626,7 +684,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const sortedMeasurements = bodyMeasurements.sort((a, b) => new Date(b.createdAt.toDate()) - new Date(a.createdAt.toDate())); // Sắp xếp theo ngày
 
             if (sortedMeasurements.length === 0) {
-                measurementsTableBody.innerHTML = `<tr><td colspan="5" class="text-center p-4 text-secondary">Chưa có dữ liệu.</td></tr>`;
+                measurementsTableBody.innerHTML = `<tr><td colspan="8" class="text-center p-4 text-secondary">Chưa có dữ liệu.</td></tr>`;
                 return;
             }
 
@@ -636,6 +694,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 row.innerHTML = `
                 <td class="p-3 text-center"><input type="checkbox" class="data-table-checkbox measurement-row-checkbox" data-id="${m.id}"></td>
                 <td class="p-3 font-medium text-primary">${formatDate(m.createdAt)}</td>
+                <td class="p-3 text-primary">${m.height || 0} cm</td>
                 <td class="p-3 text-primary">${m.weight || 0} kg</td>
                 <td class="p-3 text-primary">${m.chest || 0} cm</td>
                 <td class="p-3 text-primary">${m.waist || 0} cm</td>
@@ -660,15 +719,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const handleSaveMeasurement = async (e) => {
         e.preventDefault();
         const userId = auth.currentUser.uid; // Lấy ID người dùng đã đăng nhập
+        const height = mHeightInput ? parseFloat(mHeightInput.value) || 0 : 0;
         const weight = parseFloat(mWeightInput.value) || 0;
         const chest = parseFloat(mChestInput.value) || 0;
         const waist = parseFloat(mWaistInput.value) || 0;
         const hips = parseFloat(mHipsInput.value) || 0;
         const arm = parseFloat(mArmInput.value) || 0;
-        console.log('Saving measurement for user:', userId, weight, chest, waist, hips, arm);
+        console.log('Saving measurement for user:', userId, height, weight, chest, waist, hips, arm);
 
         try {
-            await addBodyMeasurementToFirestore(userId, weight, chest, waist, hips, arm); // Lưu vào Firestore
+            await addBodyMeasurementToFirestore(userId, height, weight, chest, waist, hips, arm); // Lưu vào Firestore (height added)
             const updatedMeasurements = await getBodyMeasurementsFromFirestore(userId);
             renderBodyMeasurementsTable(); // Cập nhật bảng hiển thị
             closeModal(measurementModal);
@@ -689,6 +749,7 @@ document.addEventListener('DOMContentLoaded', () => {
             mWaistInput.value = latestMeasurement.waist || '';
             mHipsInput.value = latestMeasurement.hips || '';
             mArmInput.value = latestMeasurement.arm || '';
+            if (mHeightInput) mHeightInput.value = latestMeasurement.height || '';
         }
         openModal(measurementModal);
         setTimeout(() => {
@@ -744,13 +805,14 @@ document.addEventListener('DOMContentLoaded', () => {
         config.forEach(value => {
             const button = document.createElement('button');
             button.className = 'btn-secondary';
-            button.style.minWidth='80px';
+            // button.style.minWidth = '80px';
             button.textContent = `${value} ${unit}`;
             button.addEventListener('click', () => deleteCallback(value));
             container.appendChild(button);
         });
     };
 
+    // Hàm để render tất cả cấu hình cài đặt
     const renderAllConfigs = async () => {
         const userId = auth.currentUser.uid; // Lấy ID người dùng đã đăng nhập
         const configurations = await getConfigurationsFromFirestore(userId); // Lấy cấu hình từ Firestore
@@ -786,9 +848,22 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    addWeightBtn.addEventListener('click', () => addNewConfig(newWeightInput, weightConfig, updateConfigurationsInFirestore));
-    addRepBtn.addEventListener('click', () => addNewConfig(newRepInput, repConfig, updateConfigurationsInFirestore));
-
+    addWeightBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            // tìm input liên quan trong cùng container (nếu không tìm được dùng input đầu tiên)
+            const containerInput = btn.parentElement ? btn.parentElement.querySelector('#new-weight-input') : null;
+            const input = containerInput || newWeightInputs[0] || null;
+            if (input) addNewConfig(input, weightConfig, updateConfigurationsInFirestore);
+        });
+    });
+    addRepBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            // tìm input liên quan trong cùng container (nếu không tìm được dùng input đầu tiên)
+            const containerInput = btn.parentElement ? btn.parentElement.querySelector('#new-rep-input') : null;
+            const input = containerInput || newRepInputs[0] || null;
+            if (input) addNewConfig(input, repConfig, updateConfigurationsInFirestore);
+        });
+    });
 
     // =================================================================
     // 12. KHỞI TẠO ỨNG DỤNG (INITIALIZATION)
@@ -817,7 +892,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     window.repConfig = configurations.repConfig || [];
 
                     // cập nhật options bộ lọc sau khi đã có dữ liệu workouts
-                    updateFilterOptions();
+                    // updateFilterOptions();
                     // Cập nhật giao diện
                     updateMuscleMap();
                     renderWeeklyView();

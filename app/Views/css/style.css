@@ -34,7 +34,9 @@ body {
     color: var(--text-primary);
     transition: background-color 0.3s ease, color 0.3s ease;
 }
-
+h2 {
+    padding-bottom: 20px;
+}
 /* ... (Các class CSS tiện ích không đổi) ... */
 .bg-primary {
     background-color: var(--bg-primary);
@@ -99,13 +101,13 @@ body {
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    border-radius: 20px;
+    border-radius: 80px;
     transition: all 0.2s ease;
     background-color: var(--bg-secondary);
     border: 2px solid var(--accent-color);
     width: 100%;
     max-width: 140px;
-    height: 140px;
+    height: 180px;
     cursor: pointer;
     text-align: center;
     padding: 8px;
@@ -147,6 +149,7 @@ html.light .muscle-circle.trained {
 }
 
 .muscle-prev-weight {
+    display: flex;
     font-size: 0.8rem;
     font-weight: 500;
     color: var(--md-sys-color-surface-variant);
@@ -217,7 +220,7 @@ html.light .muscle-circle.trained {
 .form-label {
     font-size: 0.875rem;
     font-weight: 500;
-    color: var(--text-secondary);
+    color: var(--text-primary);
     margin-bottom: 0.5rem;
     display: block;
 }
@@ -322,6 +325,8 @@ html.light .muscle-circle.trained {
     padding: 0.5rem 1rem;
     border-radius: 0.5rem;
     transition: background-color 0.2s;
+    min-width: 5.9rem;
+    min-height: 0.5rem;
 }
 
 html.light .btn-secondary {
@@ -398,3 +403,25 @@ html.light .btn-secondary {
 #workout-weight-options::-webkit-scrollbar {
     display: none; /* Ẩn thanh trượt trên Chrome, Edge */
 }
+
+#history-cards, .containers {
+    display: flex;
+    gap: 1rem;
+    flex-direction: column;
+}
+.nav-bottom {
+    position: fixed;
+    bottom: 20px;          /* Cách đáy màn hình 20px */
+    left: 50%;             /* Đẩy sang phải 50% chiều rộng màn hình */
+    transform: translateX(-50%); /* Kéo ngược lại 50% chiều rộng bản thân để vào đúng giữa */
+    z-index: 1000;
+    border-width: 2px;
+    width: 70%; /* Chiếm gần hết chiều*/
+}
+#tab-tracker-content, #tab-personal-content {
+    padding-bottom: 100px;
+}
+
+
+
+

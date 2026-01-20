@@ -40,10 +40,11 @@ const deleteWorkoutsFromFirestore = async (workoutIds) => {
 };
 
 /* Thao tác liên quan đến đo lường cơ thể */
-const addBodyMeasurementToFirestore = async (userId, weight, chest, waist, hips, arm) => {
+const addBodyMeasurementToFirestore = async (userId, height, weight, chest, waist, hips, arm) => {
     try {
         await firestore.collection('bodyMeasurements').add({
             userId,
+            height,
             weight,
             chest,
             waist,

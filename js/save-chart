@@ -1,0 +1,873 @@
+/**
+ * ==========================================
+ * 1. CẤU HÌNH & TIỆN ÍCH (CONFIG & UTILS)
+ * ==========================================
+ */
+const GYM_CONFIG = {
+    colors: {
+        heatmap: ['#f3f4f6', '#dbeafe', '#a9d4adff', '#69c872ff', '#04790fff'], // light -> darker
+        primary: '#6366F1',
+        accent: '#06B6D4'
+    },
+    dayNames: ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7']
+};
+
+const GymUtils = {
+    q: (id) => document.getElementById(id),
+
+    formatKg: (v) => (v == null || isNaN(v)) ? '--' : `${v.toFixed(1)} kg`,
+
+    sign: (v) => v > 0 ? `+${v.toFixed(1)}` : `${v.toFixed(1)}`,
+
+    parseDateField: (d) => {
+        if (!d) return null;
+        if (d instanceof firebase.firestore.Timestamp) return d.toDate();
+        const t = new Date(d);
+        return isNaN(t) ? null : t;
+    },
+
+    labelForKey: (k) => {
+        const labels = {
+            'chest': 'Ngực',
+            'waist': 'Eo',
+            'hips': 'Mông',
+            'arm': 'Tay'
+        };
+        return labels[k] || k;
+    }
+};
+
+/**
+ * ==========================================
+ * 2. DỊCH VỤ DỮ LIỆU (DATA SERVICE)
+ * Xử lý Auth và lấy dữ liệu từ Firebase
+ * ==========================================
+ */
+const GymDataService = {
+    // Lấy UID người dùng hiện tại (có timeout xử lý trễ)
+    getUid: () => {
+        return new Promise(resolve => {
+            const user = firebase.auth().currentUser;
+            if (user) return resolve(user.uid);
+            
+            const off = firebase.auth().onAuthStateChanged(u => {
+                off();
+                resolve(u ? u.uid : null);
+            });
+            // Timeout an toàn sau 3s nếu mạng chậm
+            setTimeout(() => { off(); resolve(null); }, 3000);
+        });
+    },
+
+    // Lấy dữ liệu của user cụ thể
+    // Sử dụng lại hàm từ `read-write-data.js` nếu có: getBodyMeasurementsFromFirestore, getWorkoutsFromFirestore
+    fetchUserProps: async (uid) => {
+        try {
+            // If helper functions from read-write-data.js are available, use them
+            if (typeof getBodyMeasurementsFromFirestore === 'function' && typeof getWorkoutsFromFirestore === 'function') {
+                const [measurements, workouts] = await Promise.all([
+                    getBodyMeasurementsFromFirestore(uid),
+                    getWorkoutsFromFirestore(uid)
+                ]);
+
+                // Normalize / sort: newest first by createdAt or date
+                const sortByDateDesc = (a, b) => new Date(b.createdAt || b.date || 0) - new Date(a.createdAt || a.date || 0);
+                measurements.sort(sortByDateDesc);
+                workouts.sort(sortByDateDesc);
+
+                return { measurements, workouts };
+            }
+
+            // Fallback to direct Firestore queries if helpers not found
+            const db = firebase.firestore();
+            const [msnap, wsnap] = await Promise.all([
+                db.collection('measurements').where('uid', '==', uid).orderBy('date', 'desc').get(),
+                db.collection('workouts').where('uid', '==', uid).get()
+            ]);
+            return {
+                measurements: msnap.docs.map(d => ({ id: d.id, ...d.data() })),
+                workouts: wsnap.docs.map(d => ({ id: d.id, ...d.data() }))
+            };
+        } catch (err) {
+            console.error('fetchUserProps error', err);
+            return { measurements: [], workouts: [] };
+        }
+    },
+
+    // Lấy dữ liệu chung (fallback khi không có user)
+    fetchPublicProps: async () => {
+        try {
+            const db = firebase.firestore();
+            const [msnap, wsnap] = await Promise.all([
+                db.collection('measurements').orderBy('date', 'desc').limit(20).get(),
+                db.collection('workouts').limit(200).get()
+            ]);
+            return {
+                measurements: msnap.docs.map(d => ({ id: d.id, ...d.data() })),
+                workouts: wsnap.docs.map(d => ({ id: d.id, ...d.data() }))
+            };
+        } catch (err) {
+            console.error('fetchPublicProps error', err);
+            return { measurements: [], workouts: [] };
+        }
+    }
+};
+
+/**
+ * ==========================================
+ * 3. HÀM VẼ GIAO DIỆN (UI RENDERING)
+ * Các hàm này độc lập, chỉ cần truyền data vào là chạy
+ * ==========================================
+ */
+
+// Render các ô thông tin (BMI, Cân nặng, Nhóm cơ yếu)
+function renderInfoBoxes(measurements) {
+    const bmiEl = GymUtils.q('bmi-value');
+    const weightDiffEl = GymUtils.q('weight-diff-value');
+    const weakEl = GymUtils.q('weak-muscles-value');
+
+    if (!measurements || measurements.length === 0) {
+        if (bmiEl) bmiEl.textContent = '--';
+        if (weightDiffEl) weightDiffEl.textContent = '--';
+        if (weakEl) weakEl.textContent = '--';
+        return;
+    }
+
+    const latest = measurements[0];
+    const prev = measurements[1] || null;
+
+    // 1. Tính BMI
+    let bmiText = '--';
+    if (latest.height) {
+        const h = Number(latest.height);
+        const w = Number(latest.weight);
+        if (h > 0 && !isNaN(w)) {
+            const bmi = w / ((h / 100) ** 2);
+            bmiText = bmi.toFixed(1);
+        }
+    }
+    if (bmiEl) bmiEl.textContent = bmiText;
+
+    // 2. So sánh cân nặng
+    if (prev && latest.weight != null && prev.weight != null) {
+        const diff = Number(latest.weight) - Number(prev.weight);
+        if (weightDiffEl) weightDiffEl.textContent = `${GymUtils.sign(diff)} kg`;
+    } else if (weightDiffEl) {
+        weightDiffEl.textContent = '--';
+    }
+
+    // 3. Tìm nhóm cơ yếu/tiến bộ chậm nhất
+    const ignored = new Set(['id','uid','weight','height','date','createdAt','updatedAt']);
+    const muscleKeys = Object.keys(latest).filter(k => !ignored.has(k) && typeof latest[k] === 'number');
+    let weak = '--';
+    if (prev) {
+        let best = null;
+        muscleKeys.forEach(k => {
+            const a = Number(latest[k]) || 0;
+            const b = Number(prev[k]) || 0;
+            const delta = a - b;
+            if (best === null || delta < best.delta) best = { key: k, delta, latest: a };
+        });
+        if (best) weak = `${GymUtils.labelForKey(best.key)}${best.delta < 0 ? ' (giảm)' : ''}`;
+    } else {
+        let smallest = null;
+        muscleKeys.forEach(k => {
+            const a = Number(latest[k]) || 0;
+            if (smallest === null || a < smallest.val) smallest = { key: k, val: a };
+        });
+        if (smallest) weak = GymUtils.labelForKey(smallest.key);
+    }
+    if (weakEl) weakEl.textContent = weak;
+}
+
+// Render biểu đồ tần suất tập luyện (Heatmap)
+function renderDensityHeatmap(workouts) {
+    const container = GymUtils.q('chart-density-heatmap');
+    if (!container) return;
+    container.innerHTML = '';
+
+    // If no data, show placeholder
+    if (!workouts || workouts.length === 0) {
+        const p = document.createElement('div');
+        p.className = 'text-secondary text-center';
+        p.textContent = 'Không có dữ liệu tập luyện.';
+        container.appendChild(p);
+        return;
+    }
+
+    // Count workouts per date (YYYY-MM-DD)
+    const countsMap = new Map();
+    workouts.forEach(w => {
+        const d = GymUtils.parseDateField(w.date) || (w.date && new Date(w.date));
+        if (!(d instanceof Date) || isNaN(d)) return;
+        const key = d.toISOString().slice(0,10);
+        countsMap.set(key, (countsMap.get(key) || 0) + 1);
+    });
+
+    // Build date range: last 365 days ending today
+    const today = new Date();
+    const days = 365;
+    const start = new Date(today);
+    start.setDate(start.getDate() - (days - 1));
+
+    // Align start to previous Sunday so weeks are full columns (Sunday..Saturday)
+    const startDay = start.getDay();
+    start.setDate(start.getDate() - startDay);
+
+    // Build weeks array (each week is array of 7 day objects)
+    const weeks = [];
+    let iter = new Date(start);
+    while (iter <= today) {
+        const week = [];
+        for (let i = 0; i < 7; i++) {
+            const d = new Date(iter);
+            const key = d.toISOString().slice(0,10);
+            week.push({ date: new Date(d), key, count: countsMap.get(key) || 0 });
+            iter.setDate(iter.getDate() + 1);
+        }
+        weeks.push(week);
+    }
+
+    // Find max count for color scaling
+    let max = 0;
+    weeks.forEach(w => w.forEach(cell => { if (cell.count > max) max = cell.count; }));
+    if (max === 0) max = 1;
+
+    // Create wrapper for months labels + grid
+    const monthsRow = document.createElement('div');
+    monthsRow.style.display = 'flex';
+    monthsRow.style.marginBottom = '6px';
+    monthsRow.style.alignItems = 'center';
+
+    const monthSpacer = document.createElement('div');
+    monthSpacer.style.width = '40px';
+    monthsRow.appendChild(monthSpacer);
+
+    // Determine month label positions
+    const monthLabels = [];
+    weeks.forEach((week, wi) => {
+        for (let di = 0; di < week.length; di++) {
+            const d = week[di].date;
+            if (d.getDate() === 1) {
+                monthLabels.push({ name: d.toLocaleString('default', { month: 'short' }), index: wi });
+                break;
+            }
+        }
+    });
+
+    // Render month labels (approx positioned by flex gap)
+    const monthsContainer = document.createElement('div');
+    monthsContainer.style.display = 'flex';
+    monthsContainer.style.flex = '1';
+    monthsContainer.style.alignItems = 'center';
+    monthsContainer.style.position = 'relative';
+    monthsContainer.style.height = '16px';
+
+    // create an absolutely positioned label for each month
+    // monthLabels.forEach(m => {
+    //     const label = document.createElement('div');
+    //     label.textContent = m.name;
+    //     label.style.position = 'absolute';
+    //     label.style.left = `calc(${(m.index / Math.max(weeks.length - 1,1)) * 100}% )`;
+    //     label.style.fontSize = '12px';
+    //     label.style.color = 'var(--tw-text-secondary, #9ca3af)';
+    //     monthsContainer.appendChild(label);
+    // });
+    // monthsRow.appendChild(monthsContainer);
+    // container.appendChild(monthsRow);
+
+    // Grid container
+    const grid = document.createElement('div');
+    grid.style.display = 'grid';
+    grid.style.gridTemplateRows = 'repeat(7, 12px)';
+    grid.style.gridAutoFlow = 'column';
+    grid.style.gridAutoColumns = '12px';
+    grid.style.gap = '4px';
+    grid.style.alignItems = 'center';
+    grid.style.width = '100%';
+    grid.style.overflowX = 'auto';
+
+    // Add small left labels for Mon/Wed/Fri (similar to GitHub)
+    const labelsWrap = document.createElement('div');
+    labelsWrap.style.display = 'flex';
+    labelsWrap.style.flexDirection = 'column';
+    labelsWrap.style.justifyContent = 'space-between';
+    labelsWrap.style.height = '100%';
+    labelsWrap.style.marginRight = '8px';
+    labelsWrap.style.width = '40px';
+    labelsWrap.style.paddingTop = '12px';
+    labelsWrap.style.gap = '20px';
+    ['Mon', 'Wed', 'Fri'].forEach(t => {
+        const l = document.createElement('div');
+        l.textContent = t;
+        l.style.fontSize = '12px';
+        l.style.color = 'var(--tw-text-secondary, #9ca3af)';
+        l.style.height = '12px';
+        labelsWrap.appendChild(l);
+    });
+
+    const wrapper = document.createElement('div');
+    wrapper.style.display = 'flex';
+    wrapper.style.alignItems = 'flex-start';
+    wrapper.appendChild(labelsWrap);
+    wrapper.appendChild(grid);
+
+    // Populate grid by columns (weeks)
+    weeks.forEach(week => {
+        week.forEach((cell, di) => {
+            const el = document.createElement('div');
+            el.title = `${cell.key}: ${cell.count}`;
+            el.style.width = '12px';
+            el.style.height = '12px';
+            el.style.borderRadius = '3px';
+            el.style.background = GYM_CONFIG.colors.heatmap[0];
+            const ratio = cell.count / max;
+            const colorIndex = Math.min(GYM_CONFIG.colors.heatmap.length - 1, Math.floor(ratio * (GYM_CONFIG.colors.heatmap.length - 1)));
+            el.style.background = GYM_CONFIG.colors.heatmap[colorIndex];
+            grid.appendChild(el);
+        });
+    });
+
+    // Legend
+    const legend = document.createElement('div');
+    legend.style.display = 'flex';
+    legend.style.alignItems = 'center';
+    legend.style.gap = '6px';
+    legend.style.marginTop = '8px';
+    const less = document.createElement('div'); less.textContent = 'Less'; less.style.color = 'var(--tw-text-secondary, #9ca3af)';
+    legend.appendChild(less);
+    GYM_CONFIG.colors.heatmap.forEach(c => {
+        const sw = document.createElement('div');
+        sw.style.width = '12px'; sw.style.height = '12px'; sw.style.background = c; sw.style.borderRadius = '3px';
+        legend.appendChild(sw);
+    });
+    const more = document.createElement('div'); more.textContent = 'More'; more.style.color = 'var(--tw-text-secondary, #9ca3af)';
+    legend.appendChild(more);
+
+    container.appendChild(wrapper);
+    container.appendChild(legend);
+}
+
+// Render phân tích số đo cơ thể
+function renderBodyAnalysis(measurements) {
+    const container = GymUtils.q('chart-body-radar');
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (!measurements || measurements.length === 0) {
+        const p = document.createElement('div');
+        p.className = 'text-secondary text-center';
+        p.textContent = 'Không có dữ liệu số đo.';
+        container.appendChild(p);
+        return;
+    }
+
+    // Collect numeric muscle keys across all measurements (union)
+    const ignored = new Set(['id','uid','userId','weight','height','date','createdAt','updatedAt']);
+    const keySet = new Set();
+    measurements.forEach(m => {
+        Object.keys(m).forEach(k => {
+            if (!ignored.has(k) && typeof m[k] === 'number') keySet.add(k);
+        });
+    });
+    const muscleKeys = Array.from(keySet);
+    if (muscleKeys.length === 0) {
+        const p = document.createElement('div');
+        p.className = 'text-secondary text-center';
+        p.textContent = 'Không có trường nhóm cơ hợp lệ.';
+        container.appendChild(p);
+        return;
+    }
+
+    // Determine initial (oldest) and current (newest)
+    const latest = measurements[0];
+    const initial = measurements[measurements.length - 1] || latest;
+
+    const valsInitial = muscleKeys.map(k => Number(initial[k]) || 0);
+    const valsCurrent = muscleKeys.map(k => Number(latest[k]) || 0);
+    const maxVal = Math.max(...valsInitial.concat(valsCurrent), 1);
+
+    // SVG radar params
+    const size = 300;
+    const cx = size / 2;
+    const cy = size / 2;
+    const radius = Math.min(cx, cy) - 60;
+    const levels = 4;
+    const angleStep = (Math.PI * 2) / muscleKeys.length;
+    const svgns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(svgns, 'svg');
+    svg.setAttribute('width', size);
+    svg.setAttribute('height', size);
+    svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
+
+    // background grid (levels)
+    for (let l = levels; l >= 1; l--) {
+        const r = (radius * l) / levels;
+        const pts = [];
+        for (let i = 0; i < muscleKeys.length; i++) {
+            const a = -Math.PI / 2 + i * angleStep;
+            pts.push(`${cx + Math.cos(a) * r},${cy + Math.sin(a) * r}`);
+        }
+        const poly = document.createElementNS(svgns, 'polygon');
+        poly.setAttribute('points', pts.join(' '));
+        poly.setAttribute('fill', 'none');
+        poly.setAttribute('stroke', 'rgba(156,163,175,0.12)');
+        poly.setAttribute('stroke-width', '1');
+        svg.appendChild(poly);
+    }
+
+    // axes and labels
+    muscleKeys.forEach((k, i) => {
+        const a = -Math.PI / 2 + i * angleStep;
+        const x = cx + Math.cos(a) * radius;
+        const y = cy + Math.sin(a) * radius;
+
+        const line = document.createElementNS(svgns, 'line');
+        line.setAttribute('x1', cx); line.setAttribute('y1', cy);
+        line.setAttribute('x2', x); line.setAttribute('y2', y);
+        line.setAttribute('stroke', 'rgba(156,163,175,0.12)'); line.setAttribute('stroke-width', '1');
+        svg.appendChild(line);
+
+        const lx = cx + Math.cos(a) * (radius + 18);
+        const ly = cy + Math.sin(a) * (radius + 18);
+        const text = document.createElementNS(svgns, 'text');
+        text.setAttribute('x', lx); text.setAttribute('y', ly);
+        text.setAttribute('font-size', '12');
+        text.setAttribute('fill', 'var(--text-primary, #111827)');
+        text.setAttribute('text-anchor', Math.cos(a) > 0.1 ? 'start' : Math.cos(a) < -0.1 ? 'end' : 'middle');
+        text.setAttribute('dominant-baseline', Math.sin(a) > 0.2 ? 'hanging' : Math.sin(a) < -0.2 ? 'baseline' : 'middle');
+        text.textContent = GymUtils.labelForKey(k);
+        svg.appendChild(text);
+    });
+
+    // helper to create polygon from values
+    function polygonFrom(valuesArr) {
+        return valuesArr.map((v, i) => {
+            const ratio = v / maxVal;
+            const r = ratio * radius;
+            const a = -Math.PI / 2 + i * angleStep;
+            return `${cx + Math.cos(a) * r},${cy + Math.sin(a) * r}`;
+        }).join(' ');
+    }
+
+    // initial polygon (grey)
+    const initPoly = document.createElementNS(svgns, 'polygon');
+    initPoly.setAttribute('points', polygonFrom(valsInitial));
+    initPoly.setAttribute('fill', 'rgba(148,163,184,0.18)');
+    initPoly.setAttribute('stroke', 'rgba(148,163,184,0.9)');
+    initPoly.setAttribute('stroke-width', '1.5');
+    svg.appendChild(initPoly);
+
+    // current polygon (primary)
+    const currPoly = document.createElementNS(svgns, 'polygon');
+    currPoly.setAttribute('points', polygonFrom(valsCurrent));
+    currPoly.setAttribute('fill', GYM_CONFIG.colors.primary);
+    currPoly.setAttribute('fill-opacity', '0.18');
+    currPoly.setAttribute('stroke', GYM_CONFIG.colors.primary);
+    currPoly.setAttribute('stroke-width', '2');
+    svg.appendChild(currPoly);
+
+    // markers for current
+    valsCurrent.forEach((v, i) => {
+        const ratio = v / maxVal;
+        const r = ratio * radius;
+        const a = -Math.PI / 2 + i * angleStep;
+        const x = cx + Math.cos(a) * r;
+        const y = cy + Math.sin(a) * r;
+        const c = document.createElementNS(svgns, 'circle');
+        c.setAttribute('cx', x); c.setAttribute('cy', y); c.setAttribute('r', '4');
+        c.setAttribute('fill', GYM_CONFIG.colors.primary); c.setAttribute('stroke', '#fff'); c.setAttribute('stroke-width', '1');
+        c.setAttribute('title', `${GymUtils.labelForKey(muscleKeys[i])}: ${v}`);
+        svg.appendChild(c);
+    });
+
+    // legend
+    const legend = document.createElement('div');
+    legend.style.display = 'flex'; legend.style.alignItems = 'center'; legend.style.gap = '12px';
+    legend.style.marginTop = '10px';
+
+    const createLegendItem = (color, text) => {
+        const item = document.createElement('div'); item.style.display = 'flex'; item.style.alignItems = 'center'; item.style.gap = '8px';
+        const dot = document.createElement('span'); dot.style.width = '12px'; dot.style.height = '12px'; dot.style.borderRadius = '50%'; dot.style.display = 'inline-block'; dot.style.background = color; dot.style.border = '2px solid #fff'; dot.style.boxShadow = '0 0 0 1px rgba(0,0,0,0.06)';
+        const lbl = document.createElement('div'); lbl.textContent = text; lbl.style.fontSize = '13px'; lbl.style.color = 'var(--tw-text-secondary, #6b7280)';
+        item.appendChild(dot); item.appendChild(lbl); return item;
+    };
+    legend.appendChild(createLegendItem('rgba(148,163,184,0.9)', 'Bắt đầu'));
+    legend.appendChild(createLegendItem(GYM_CONFIG.colors.primary, 'Hiện tại'));
+
+    // Compose outer container
+    const header = document.createElement('div');
+    header.style.display = 'flex';
+    header.style.justifyContent = 'space-between';
+    header.style.alignItems = 'center';
+    header.style.marginBottom = '8px';
+    header.style.width = '100%';
+
+    const hLeft = document.createElement('div');
+    hLeft.textContent = 'Phân tích tỷ lệ cơ thể';
+    hLeft.style.fontWeight = '600';
+    header.appendChild(hLeft);
+
+    const outer = document.createElement('div');
+    outer.style.display = 'flex';
+    outer.style.flexDirection = 'column';
+    outer.style.alignItems = 'center';
+    outer.style.width = '100%';
+
+    outer.appendChild(header);
+    outer.appendChild(header);
+
+    // If Chart.js is available, use a canvas + Chart.js radar for faster rendering.
+    if (window.Chart && typeof Chart === 'function') {
+        // helper: convert hex to rgba
+        function hexToRgba(hex, alpha) {
+            if (!hex) return `rgba(99,102,241,${alpha})`;
+            const h = hex.replace('#', '');
+            const full = h.length === 3 ? h.split('').map(c => c + c).join('') : h;
+            const bigint = parseInt(full, 16);
+            const r = (bigint >> 16) & 255;
+            const g = (bigint >> 8) & 255;
+            const b = bigint & 255;
+            return `rgba(${r},${g},${b},${alpha})`;
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.style.maxWidth = '100%';
+        canvas.style.height = '300px';
+        outer.appendChild(canvas);
+
+        try {
+            const ctx = canvas.getContext('2d');
+            const labels = muscleKeys.map(k => GymUtils.labelForKey(k));
+            const dsInitial = {
+                label: 'Bắt đầu',
+                data: valsInitial,
+                backgroundColor: 'rgba(148,163,184,0.18)',
+                borderColor: 'rgba(148,163,184,0.9)',
+                borderWidth: 1.5,
+                pointRadius: 3
+            };
+            const dsCurrent = {
+                label: 'Hiện tại',
+                data: valsCurrent,
+                backgroundColor: hexToRgba(GYM_CONFIG.colors.primary, 0.18),
+                borderColor: GYM_CONFIG.colors.primary,
+                borderWidth: 2,
+                pointRadius: 4
+            };
+
+            new Chart(ctx, {
+                type: 'radar',
+                data: { labels, datasets: [dsInitial, dsCurrent] },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        r: {
+                            suggestedMin: 0,
+                            suggestedMax: Math.max(1, maxVal),
+                            ticks: { stepSize: Math.ceil(Math.max(1, maxVal) / 4) }
+                        }
+                    },
+                    plugins: { legend: { position: 'bottom' } }
+                }
+            });
+        } catch (e) {
+            console.error('Chart.js render error, falling back to SVG', e);
+            svg.style.maxWidth = '100%';
+            svg.style.height = 'auto';
+            outer.appendChild(svg);
+        }
+    } else {
+        // Fallback: keep original SVG renderer when Chart.js is not loaded
+        svg.style.maxWidth = '100%';
+        svg.style.height = 'auto';
+        outer.appendChild(svg);
+    }
+
+    // center legend
+    legend.style.alignSelf = 'center';
+    outer.appendChild(legend);
+
+    container.appendChild(outer);
+}
+
+// Setup chart tab switching (density <-> body analysis)
+function setupChartTabs() {
+    const dBtn = GymUtils.q('chart-tab-density-btn');
+    const bBtn = GymUtils.q('chart-tab-body-btn');
+    const dTab = GymUtils.q('chart-tab-density');
+    const bTab = GymUtils.q('chart-tab-body');
+    if (!dBtn || !bBtn || !dTab || !bTab) return;
+
+    function setActive(isDensity) {
+        dBtn.classList.toggle('tab-active', isDensity);
+        dBtn.classList.toggle('tab-inactive', !isDensity);
+        bBtn.classList.toggle('tab-active', !isDensity);
+        bBtn.classList.toggle('tab-inactive', isDensity);
+        dTab.classList.toggle('hidden', !isDensity);
+        bTab.classList.toggle('hidden', isDensity);
+    }
+
+    // Initialize state from existing classes (fallback to density)
+    const initialDensity = dBtn.classList.contains('tab-active') || dTab.classList.contains('chart-tab-active');
+    setActive(Boolean(initialDensity));
+
+    dBtn.addEventListener('click', () => setActive(true));
+    bBtn.addEventListener('click', () => setActive(false));
+}
+
+/**
+ * ==========================================
+ * 4. LOGIC CHÍNH & KHỞI TẠO (MAIN)
+ * Điều phối các hàm trên để chạy ứng dụng
+ * ==========================================
+ */
+(function MainApp() {
+    
+    // Hàm gọi tất cả render
+    function renderAllCharts(measurements, workouts) {
+        renderInfoBoxes(measurements);
+        renderDensityHeatmap(workouts);
+        renderBodyAnalysis(measurements);
+    }
+
+    // Hàm khởi tạo chính
+    async function init() {
+        try {
+            // init tab switching for charts
+            try { setupChartTabs(); } catch(e) { /* ignore */ }
+
+            const uid = await GymDataService.getUid();
+            let data;
+
+            if (uid) {
+                // Có user: lấy data riêng
+                data = await GymDataService.fetchUserProps(uid);
+            } else {
+                // Không user: lấy data mẫu/public
+                console.log('Chưa đăng nhập, tải dữ liệu mẫu...');
+                data = await GymDataService.fetchPublicProps();
+            }
+
+            renderAllCharts(data.measurements, data.workouts);
+
+        } catch (err) {
+            console.error('Lỗi khởi tạo biểu đồ:', err);
+        }
+    }
+
+    // Lắng nghe sự kiện load
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+
+})();
+
+
+// Render biểu đồ tần suất tập luyện (Heatmap) - Sử dụng Chart.js
+function renderDensityHeatmap(workouts) {
+    const container = GymUtils.q('chart-density-heatmap');
+    if (!container) return;
+    container.innerHTML = '';
+
+    // Kiểm tra dữ liệu
+    if (!workouts || workouts.length === 0) {
+        const p = document.createElement('div');
+        p.className = 'text-secondary text-center';
+        p.textContent = 'Không có dữ liệu tập luyện.';
+        container.appendChild(p);
+        return;
+    }
+
+    // Kiểm tra thư viện Chart.js
+    if (typeof Chart === 'undefined') {
+        const p = document.createElement('div');
+        p.className = 'text-error text-center';
+        p.textContent = 'Lỗi: Thư viện Chart.js chưa được tải.';
+        container.appendChild(p);
+        return;
+    }
+
+    // 1. Xử lý dữ liệu: Đếm số buổi tập theo ngày
+    const countsMap = new Map();
+    workouts.forEach(w => {
+        const d = GymUtils.parseDateField(w.date) || (w.date && new Date(w.date));
+        if (d && !isNaN(d)) {
+            const key = d.toISOString().slice(0, 10);
+            countsMap.set(key, (countsMap.get(key) || 0) + 1);
+        }
+    });
+
+    // 2. Thiết lập khung thời gian: Từ 01/01 năm nay đến hôm nay
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    const startOfYear = new Date(currentYear, 0, 1); // 01 Jan
+    
+    // Tìm max count để tính màu
+    let maxCount = 0;
+    for (let c of countsMap.values()) {
+        if (c > maxCount) maxCount = c;
+    }
+    if (maxCount === 0) maxCount = 1;
+
+    // 3. Tạo data points cho Chart.js (Scatter chart mô phỏng Heatmap)
+    const dataPoints = [];
+    const backgroundColors = [];
+    const borderColors = [];
+    
+    let iterDate = new Date(startOfYear);
+    // Điều chỉnh ngày bắt đầu lùi về Chủ Nhật gần nhất để lưới căn thẳng hàng tuần đầu tiên
+    const dayOffset = iterDate.getDay(); 
+    iterDate.setDate(iterDate.getDate() - dayOffset);
+
+    // Vòng lặp tạo grid
+    while (iterDate <= today) {
+        const dateKey = iterDate.toISOString().slice(0, 10);
+        // Chỉ hiển thị dữ liệu thuộc năm hiện tại (các ngày bù đầu năm của năm trước sẽ ẩn hoặc xám)
+        const isCurrentYear = iterDate.getFullYear() === currentYear;
+        
+        const count = isCurrentYear ? (countsMap.get(dateKey) || 0) : 0;
+        
+        // Tính toán tọa độ
+        // X: Số tuần tính từ đầu năm
+        const diffTime = Math.abs(iterDate - startOfYear);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+        // Đơn giản hóa: X là tuần tự tăng dần dựa trên loop
+        // Chúng ta dùng một biến đếm tuần logic hơn ở dưới, nhưng ở đây dùng time-based:
+        // Cách đơn giản nhất cho scatter: X = tuần của năm, Y = thứ trong tuần
+        
+        // Sử dụng thư viện Moment hoặc tính thủ công tuần trong năm. 
+        // Ở đây tính thủ công đơn giản:
+        const dayOfYear = (iterDate - new Date(iterDate.getFullYear(), 0, 0)) / 1000 / 60 / 60 / 24;
+        const weekNum = Math.floor((iterDate - startOfYear) / (7 * 24 * 60 * 60 * 1000)) + (dayOffset > 0 ? 1 : 0);
+        // Cách đơn giản hơn: Dùng số mili giây chia cho tuần để ra trục X tương đối
+        const xVal = Math.floor((iterDate.getTime() - startOfYear.getTime() + (dayOffset * 86400000)) / 604800000); 
+
+        const dayOfWeek = iterDate.getDay(); // 0 (CN) -> 6 (T7)
+
+        // Tính màu sắc
+        let color = GYM_CONFIG.colors.heatmap[0]; // Mặc định (0 bài)
+        if (count > 0) {
+            const ratio = count / maxCount;
+            const colorIdx = Math.min(GYM_CONFIG.colors.heatmap.length - 1, Math.floor(ratio * (GYM_CONFIG.colors.heatmap.length - 1)) + 1);
+            color = GYM_CONFIG.colors.heatmap[Math.min(colorIdx, GYM_CONFIG.colors.heatmap.length - 1)];
+        }
+        
+        // Nếu là ngày bù của năm trước, làm mờ đi
+        if (!isCurrentYear) color = 'transparent';
+
+        dataPoints.push({
+            x: xVal,
+            y: dayOfWeek,
+            v: count,
+            d: dateKey // Lưu ngày để hiển thị tooltip
+        });
+
+        backgroundColors.push(color);
+        borderColors.push(count > 0 ? 'rgba(0,0,0,0.05)' : 'transparent');
+
+        // Tăng ngày
+        iterDate.setDate(iterDate.getDate() + 1);
+    }
+
+    // 4. Tạo DOM elements
+    // Tiêu đề
+    const header = document.createElement('div');
+    header.style.marginBottom = '8px';
+    header.style.fontWeight = '600';
+    header.textContent = `Tần suất tập luyện (${currentYear})`;
+    container.appendChild(header);
+
+    // Canvas Container (để scroll ngang nếu năm dài)
+    const scrollWrap = document.createElement('div');
+    scrollWrap.style.width = '100%';
+    scrollWrap.style.overflowX = 'auto';
+    
+    const canvasBox = document.createElement('div');
+    canvasBox.style.height = '160px'; // Chiều cao cố định cho 7 ngày
+    canvasBox.style.minWidth = '600px'; // Đảm bảo không bị co quá nhỏ
+    canvasBox.style.position = 'relative';
+
+    const canvas = document.createElement('canvas');
+    canvasBox.appendChild(canvas);
+    scrollWrap.appendChild(canvasBox);
+    container.appendChild(scrollWrap);
+
+    // Legend (Chú thích màu)
+    const legend = document.createElement('div');
+    legend.style.display = 'flex';
+    legend.style.alignItems = 'center';
+    legend.style.gap = '6px';
+    legend.style.marginTop = '8px';
+    legend.style.fontSize = '12px';
+    legend.style.color = '#6b7280';
+    
+    legend.innerHTML = `<span>Ít</span>`;
+    GYM_CONFIG.colors.heatmap.forEach(c => {
+        const dot = document.createElement('span');
+        dot.style.width = '12px'; dot.style.height = '12px';
+        dot.style.backgroundColor = c; dot.style.borderRadius = '2px';
+        legend.appendChild(dot);
+    });
+    legend.innerHTML += `<span>Nhiều</span>`;
+    container.appendChild(legend);
+
+    // 5. Cấu hình Chart.js
+    const ctx = canvas.getContext('2d');
+    new Chart(ctx, {
+        type: 'scatter',
+        data: {
+            datasets: [{
+                label: 'Heatmap',
+                data: dataPoints,
+                backgroundColor: backgroundColors,
+                borderColor: borderColors,
+                borderWidth: 1,
+                pointRadius: 6, // Kích thước ô vuông
+                pointHoverRadius: 8,
+                pointStyle: 'rectRounded' // Hình dạng ô vuông bo góc
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(ctx) {
+                            const item = ctx.raw;
+                            // Format ngày: dd/mm
+                            const dateStr = item.d.split('-').reverse().slice(0,2).join('/');
+                            return `${dateStr}: ${item.v} bài tập`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    display: false, // Ẩn trục X để trông giống heatmap thuần
+                    grid: { display: false },
+                    min: -0.5,
+                },
+                y: {
+                    type: 'category',
+                    labels: GYM_CONFIG.dayNames, // ['CN', 'T2', ..., 'T7']
+                    reverse: true, // Đảo ngược để CN ở trên hoặc dưới tùy ý (GitHub thường để CN ở hàng đầu tiên - index 0)
+                    grid: { display: false },
+                    ticks: {
+                        font: { size: 10 },
+                        padding: 5,
+                        color: '#9ca3af'
+                    }
+                }
+            },
+            layout: {
+                padding: { left: 0, right: 10, top: 10, bottom: 10 }
+            }
+        }
+    });
+}
