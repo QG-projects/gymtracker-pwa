@@ -416,7 +416,7 @@ html.light .btn-secondary {
     transform: translateX(-50%); /* Kéo ngược lại 50% chiều rộng bản thân để vào đúng giữa */
     z-index: 1000;
     border-width: 2px;
-    width: 70%; /* Chiếm gần hết chiều*/
+    width: 80%; /* Chiếm gần hết chiều*/
 }
 #tab-tracker-content, #tab-personal-content {
     padding-bottom: 100px;
